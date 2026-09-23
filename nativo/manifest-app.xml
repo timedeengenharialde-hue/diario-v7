@@ -1,0 +1,9 @@
+        <receiver android:name=".GatoWidget" android:exported="false" android:label="Gato do diário">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/gato_widget_info" />
+        </receiver>
+        <service android:name=".GatoFlutuante" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Mascote flutuante que mostra o humor e lembra os remédios" />
+        </service>

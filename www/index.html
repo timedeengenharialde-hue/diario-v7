@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diário de Sintomas</title>
+<style>
+:root{--bg:#1c1c1b;--card:#e9e9e6;--ink:#1d1d1b;--mute:#62625e;--line:#d0d0cb;--pri:#1b8f4c;--pri2:#d6f0df;--warn:#b86e00;--red:#c9302a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Roboto,"Segoe UI",system-ui,sans-serif;font-size:15px}
+body{padding:max(env(safe-area-inset-top),24px) 0 calc(64px + env(safe-area-inset-bottom))}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+main{max-width:520px;margin:0 auto;padding:8px 14px}
+h1{font-size:18px;margin:4px 0 10px;color:#f1f1ee}
+h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.top{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;position:relative;height:118px;margin-bottom:6px}
+.pillbox{margin-right:auto;margin-bottom:8px;display:grid;gap:4px}
+.pillbox span{background:var(--card);border-radius:14px;padding:4px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.pillbox b{color:var(--pri)}
+.cat{width:148px;height:112px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.cat svg,.cat img{width:100%;height:100%;display:block;object-fit:contain}
+.bubble{position:absolute;right:140px;top:2px;max-width:215px;background:#fff;border-radius:10px 10px 2px 10px;padding:7px 10px;font-size:13px;line-height:1.3;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.meds{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.med{border-radius:8px;padding:10px;background:#f4f4f1}
+.med b{display:block}
+.med small{color:var(--mute);display:block;margin:2px 0 8px}
+.btn{border:0;border-radius:10px;padding:10px 14px;background:var(--pri2);color:var(--pri);font-weight:600}
+.btn.pri{background:var(--pri);color:#fff}
+.btn.full{width:100%}
+.btn.ghost{background:transparent;color:var(--mute);font-weight:500}
+.btn.del{background:transparent;color:var(--red);padding:4px 8px;font-weight:500}
+.grp{margin-bottom:10px}
+.grp h3{font-size:12.5px;color:var(--mute);font-weight:600;margin:0 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:18px;padding:7px 12px;font-size:14px}
+.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.sel{display:grid;gap:8px;margin:10px 0}
+.selrow{display:flex;align-items:center;gap:8px}
+.selrow span{flex:1;font-weight:600}
+.lv{display:flex;gap:4px}
+.lv button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:#fff}
+.lv button.on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:700}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--mute);margin-top:8px}
+input[type=text],input[type=datetime-local],textarea,select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;font-size:15px;color:var(--ink)}
+textarea{min-height:64px;resize:vertical}
+.note{font-size:12.5px;color:var(--mute);line-height:1.4}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:12px 4px;color:var(--mute);font-size:13px}
+nav button.on{color:var(--pri);font-weight:700}
+.seg{display:flex;gap:6px;margin-bottom:10px}
+.seg button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px}
+.seg button.on{background:var(--pri2);border-color:var(--pri);color:var(--pri);font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+th{color:var(--mute);font-weight:600;font-size:12px}
+td.n{text-align:right;white-space:nowrap}
+.entry{padding:10px 0;border-bottom:1px solid var(--line)}
+.entry:last-child{border-bottom:0}
+.entry .h{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mute)}
+.entry .b{margin-top:3px;line-height:1.4}
+.tag{display:inline-block;font-size:12px;background:var(--pri2);color:var(--pri);border-radius:6px;padding:1px 6px;margin-left:4px}
+.tag.med{background:#f6ecdf;color:var(--warn)}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;z-index:5}
+.sheet.show{display:flex}
+.sheet .in{background:#fff;width:100%;max-width:520px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.row2{display:flex;gap:8px;margin-top:12px}
+.row2 .btn{flex:1}
+</style>
+</head>
+<body>
+<main><div class="top"><div class="bubble" id="bubble"></div><div class="pillbox" id="pills"></div><div class="cat" id="cat"></div></div><div id="err"></div><div id="main"><div class="card">Carregando… (versão 7)</div></div></main>
+<nav>
+  <button data-tab="hoje" class="on">Registrar</button>
+  <button data-tab="rel">Relatório</button>
+  <button data-tab="hist">Histórico</button>
+  <span style="position:absolute;right:6px;bottom:2px;font-size:9px;color:#9a9a96">v7 · <span id="bstamp">local</span></span>
+</nav>
+<div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* Roda antes de tudo: mostra erros na tela (inclusive de sintaxe) e completa funções que faltam em Android antigo */
+window.onerror = function (m, f, l) {
+  var el = document.getElementById('err');
+  if (el) el.innerHTML += '<div class="card">Erro ao abrir: ' + m + ' (linha ' + l + ')<br><small>' + navigator.userAgent + '</small><br>Mande um print disso.</div>';
+};
+if (!Object.fromEntries) Object.fromEntries = function (a) { var o = {}; Array.from(a).forEach(function (p) { o[p[0]] = p[1]; }); return o; };
+if (!Array.prototype.flatMap) Array.prototype.flatMap = function (f) { return [].concat.apply([], this.map(f)); };
+if (!Array.prototype.flat) Array.prototype.flat = function () { return [].concat.apply([], this); };
+</script>
+<script src="build.js"></script>
+<script>
+const KEY = "diario-sintomas.v1";
+const CAPN = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const H = 36e5, D = 864e5;
+const GRUPOS = [
+  ["Bem", [["tranquilo", "Tranquilo"], ["focado", "Focado"], ["disposto", "Disposto"]]],
+  ["Energia", [["sonolencia", "Sonol\xEAncia"], ["cansaco", "Cansa\xE7o"], ["agitacao", "Agita\xE7\xE3o"], ["inquietacao", "Inquieta\xE7\xE3o"]]],
+  ["Humor", [["irritacao", "Irrita\xE7\xE3o"], ["ansiedade", "Ansiedade"], ["tristeza", "Tristeza"], ["desanimo", "Des\xE2nimo"], ["choro", "Choro f\xE1cil"]]],
+  ["Foco", [["distracao", "Distra\xE7\xE3o"], ["esquecimento", "Esquecimento"], ["procrastinacao", "Procrastina\xE7\xE3o"], ["hiperfoco", "Hiperfoco"]]],
+  ["Corpo", [["apetite", "Falta de apetite"], ["insonia", "Ins\xF4nia"], ["cabeca", "Dor de cabe\xE7a"], ["coracao", "Cora\xE7\xE3o acelerado"], ["nausea", "N\xE1usea"]]],
+  ["Social", [["naosair", "N\xE3o quis sair"], ["evitar", "Evitei pessoas"]]]
+];
+const NOME = Object.fromEntries(GRUPOS.flatMap((g) => g[1]));
+const MEDS = { rit: "Ritalina", esc: "Escitalopram" };
+let S = load();
+let tab = "hoje", pend = {}, periodo = 7;
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.entries) {
+      s.lemb = s.lemb || { rit: [], esc: [] };
+      return s;
+    }
+  } catch (e) {
+  }
+  return { entries: [], doses: [], lastDose: { rit: "", esc: "10 mg" }, lemb: { rit: [], esc: [] } };
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(S));
+  } catch (e) {
+  }
+  syncWidget();
+}
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const fmt = (t) => new Date(t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const fmtD = (t) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+const hs = (ms) => (ms / H).toFixed(1).replace(".", ",") + " h";
+function toLocal(ms) {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 6e4);
+  return d.toISOString().slice(0, 16);
+}
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+function lastDoseBefore(med, t) {
+  let best = null;
+  for (const d of S.doses) if (d.med === med && d.t <= t && (!best || d.t > best.t)) best = d;
+  return best;
+}
+function sinceTxt(med, t) {
+  const d = lastDoseBefore(med, t);
+  return d ? hs(t - d.t) : null;
+}
+function hojeHTML() {
+  const t = Date.now();
+  const med = (k) => {
+    const d = lastDoseBefore(k, t);
+    return '<div class="med"><b>'.concat(MEDS[k], "</b><small>").concat(d ? "\xDAltima: " + fmt(d.t) + " (h\xE1 " + hs(t - d.t) + ")" : "Nenhum registro", '</small>\n      <button class="btn full" data-dose="').concat(k, '">Tomei agora</button></div>');
+  };
+  const sel = Object.keys(pend);
+  return '  <div class="card"><h2>Rem\xE9dios</h2><div class="meds">'.concat(med("rit")).concat(med("esc"), '</div>\n    <div class="row2"><button class="btn full" data-act="lembretes">\u23F0 Lembretes: ').concat(lembResumo(), '</button></div>\n    <div class="row2"><button class="btn full" data-act="flutuante">\u{1F431} Gato flutuante na tela: ').concat(S.flut ? "ligado" : "desligado", '</button></div>\n    <p class="note">Aqui s\xF3 se registra o que voc\xEA tomou. Mudan\xE7a de dose, s\xF3 com quem prescreve.</p></div>\n  <div class="card">\n    ').concat(GRUPOS.map(([g, it]) => '<div class="grp"><h3>'.concat(g, '</h3><div class="chips">').concat(it.map(([k, n]) => '<button class="chip '.concat(pend[k] ? "on" : "", '" data-chip="').concat(k, '">').concat(n, "</button>")).join(""), "</div></div>")).join(""), "\n    ").concat(sel.length ? '<div class="sel"><div class="note">Intensidade: 1 = leve, 5 = muito forte</div>'.concat(sel.map((k) => '<div class="selrow"><span>'.concat(NOME[k], '</span>\n      <div class="lv">').concat([1, 2, 3, 4, 5].map((n) => '<button class="'.concat(pend[k] === n ? "on" : "", '" data-lv="').concat(k, '" data-n="').concat(n, '">').concat(n, "</button>")).join(""), "</div></div>")).join(""), "</div>") : "", "\n    ").concat(pend.naosair ? '<label class="f">Por que n\xE3o quis sair?<input type="text" id="motivo" placeholder="Ex.: cansado, sem vontade de ver gente, chuva"></label>' : "", '\n    <label class="f">Anota\xE7\xE3o (opcional)<textarea id="nota" placeholder="O que aconteceu, onde estava, o que ajudou"></textarea></label>\n    <label class="f">Quando<input type="datetime-local" id="quando" value="').concat(toLocal(t), '"></label>\n    <div class="row2"><button class="btn pri" data-act="salvar">Salvar registro</button></div>\n  </div>\n  <p class="note" style="color:#9a9a96;text-align:center">Vers\xE3o 7 \xB7 build ').concat(window.BUILD || "local", "</p>");
+}
+function stats() {
+  const ini = Date.now() - periodo * D;
+  const ents = S.entries.filter((e) => e.t >= ini).sort((a, b) => a.t - b.t);
+  const doses = S.doses.filter((d) => d.t >= ini).sort((a, b) => a.t - b.t);
+  const por = {};
+  for (const e of ents) for (const s of e.s) {
+    const p = por[s.k] || (por[s.k] = { n: 0, soma: 0, rit: [] });
+    p.n++;
+    p.soma += s.n;
+    const r = lastDoseBefore("rit", e.t);
+    if (r && e.t - r.t < 24 * H) p.rit.push(e.t - r.t);
+  }
+  const lista = Object.entries(por).sort((a, b) => b[1].n - a[1].n);
+  return { ini, ents, doses, lista };
+}
+function relHTML() {
+  const { ents, doses, lista } = stats();
+  const nd = (k) => doses.filter((d) => d.med === k);
+  const media = (a) => a.length ? hs(a.reduce((x, y) => x + y, 0) / a.length) : "\u2014";
+  const motivos = ents.filter((e) => e.motivo);
+  return '<h1>Relat\xF3rio</h1>\n  <div class="seg">'.concat([7, 14, 30].map((p) => '<button class="'.concat(periodo === p ? "on" : "", '" data-per="').concat(p, '">').concat(p, " dias</button>")).join(""), '</div>\n  <div class="card"><h2>Rem\xE9dios no per\xEDodo</h2>\n    <table><tr><th>Rem\xE9dio</th><th class="n">Vezes</th><th class="n">Dias com dose</th></tr>\n    ').concat(["rit", "esc"].map((k) => {
+    const l = nd(k);
+    const dias = new Set(l.map((d) => fmtD(d.t))).size;
+    return "<tr><td>".concat(MEDS[k], '</td><td class="n">').concat(l.length, '</td><td class="n">').concat(dias, " de ").concat(periodo, "</td></tr>");
+  }).join(""), '</table></div>\n  <div class="card"><h2>Sintomas mais frequentes</h2>\n    ').concat(lista.length ? '<table><tr><th>Sintoma</th><th class="n">Vezes</th><th class="n">Intens.</th><th class="n">Ap\xF3s Ritalina</th></tr>\n    '.concat(lista.map(([k, p]) => "<tr><td>".concat(NOME[k], '</td><td class="n">').concat(p.n, '</td><td class="n">').concat((p.soma / p.n).toFixed(1).replace(".", ","), '</td><td class="n">').concat(media(p.rit), "</td></tr>")).join(""), '</table>\n    <p class="note">"Ap\xF3s Ritalina" = tempo m\xE9dio entre a \xFAltima dose e o registro (s\xF3 conta at\xE9 24 h).</p>') : '<p class="note">Nenhum registro neste per\xEDodo.</p>', "</div>\n  ").concat(motivos.length ? '<div class="card"><h2>Por que n\xE3o quis sair</h2>'.concat(motivos.map((e) => '<div class="entry"><div class="h">'.concat(fmt(e.t), '</div><div class="b">').concat(esc(e.motivo), "</div></div>")).join(""), "</div>") : "", '\n  <button class="btn pri full" data-act="compartilhar">Enviar relat\xF3rio (WhatsApp, e-mail\u2026)</button>');
+}
+function relTexto() {
+  const { ini, ents, doses, lista } = stats();
+  const L = [];
+  L.push("DI\xC1RIO DE SINTOMAS: " + fmtD(ini) + " a " + fmtD(Date.now()));
+  L.push("");
+  L.push("REM\xC9DIOS");
+  for (const k of ["rit", "esc"]) {
+    const l = doses.filter((d) => d.med === k);
+    L.push("- " + MEDS[k] + ": " + l.length + " dose(s), em " + new Set(l.map((d) => fmtD(d.t))).size + " de " + periodo + " dias");
+  }
+  L.push("");
+  L.push("SINTOMAS (vezes | intensidade m\xE9dia 1-5 | tempo m\xE9dio ap\xF3s Ritalina)");
+  if (!lista.length) L.push("- nenhum registro");
+  for (const [k, p] of lista) {
+    const m = p.rit.length ? hs(p.rit.reduce((x, y) => x + y, 0) / p.rit.length) : "-";
+    L.push("- " + NOME[k] + ": " + p.n + "x | " + (p.soma / p.n).toFixed(1).replace(".", ",") + " | " + m);
+  }
+  const mot = ents.filter((e) => e.motivo);
+  if (mot.length) {
+    L.push("");
+    L.push("POR QUE N\xC3O QUIS SAIR");
+    mot.forEach((e) => L.push("- " + fmt(e.t) + ": " + e.motivo));
+  }
+  L.push("");
+  L.push("REGISTROS");
+  const tudo = [...ents.map((e) => ({ t: e.t, e })), ...doses.map((d) => ({ t: d.t, d }))].sort((a, b) => a.t - b.t);
+  for (const x of tudo) {
+    if (x.d) {
+      L.push(fmt(x.t) + " | TOMOU " + MEDS[x.d.med] + (x.d.dose ? " " + x.d.dose : ""));
+      continue;
+    }
+    const e = x.e, r = sinceTxt("rit", e.t);
+    L.push(fmt(e.t) + (r ? " | Ritalina h\xE1 " + r : "") + " | " + e.s.map((s) => NOME[s.k] + " " + s.n).join(", ") + (e.nota ? " | " + e.nota : ""));
+  }
+  return L.join("\n");
+}
+async function compartilhar() {
+  const text = relTexto();
+  const Sh = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  try {
+    if (Sh) {
+      await Sh.share({ title: "Di\xE1rio de sintomas", text });
+      return;
+    }
+    if (navigator.share) {
+      await navigator.share({ title: "Di\xE1rio de sintomas", text });
+      return;
+    }
+  } catch (e) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Relat\xF3rio copiado");
+  } catch (e) {
+    toast("N\xE3o foi poss\xEDvel compartilhar");
+  }
+}
+function histHTML() {
+  const tudo = [...S.entries.map((e) => ({ t: e.t, e })), ...S.doses.map((d) => ({ t: d.t, d }))].sort((a, b) => b.t - a.t).slice(0, 200);
+  return '<h1>Hist\xF3rico</h1><div class="card">'.concat(tudo.length ? tudo.map((x) => {
+    if (x.d) return '<div class="entry"><div class="h"><span>'.concat(fmt(x.t), '<span class="tag med">').concat(MEDS[x.d.med], " ").concat(esc(x.d.dose || ""), '</span></span>\n      <button class="btn del" data-deld="').concat(x.d.id, '">Excluir</button></div></div>');
+    const e = x.e, r = sinceTxt("rit", e.t);
+    return '<div class="entry"><div class="h"><span>'.concat(fmt(e.t)).concat(r ? '<span class="tag">Ritalina h\xE1 '.concat(r, "</span>") : "", '</span>\n      <button class="btn del" data-dele="').concat(e.id, '">Excluir</button></div>\n      <div class="b">').concat(e.s.map((s) => esc(NOME[s.k]) + " " + s.n).join(", ")).concat(e.motivo ? "<br><i>N\xE3o quis sair: " + esc(e.motivo) + "</i>" : "").concat(e.nota ? "<br>" + esc(e.nota) : "", "</div></div>");
+  }).join("") : '<p class="note">Nenhum registro ainda. Comece em Registrar.</p>', "</div>");
+}
+const LN = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? window.Capacitor.Plugins.LocalNotifications : null;
+function lembResumo() {
+  const r = ["rit", "esc"].filter((k) => S.lemb[k].length).map((k) => MEDS[k] + " " + S.lemb[k].join(", "));
+  return r.length ? r.join(" \xB7 ") : "nenhum";
+}
+function abrirLembretes() {
+  const bloco = (k) => '<div class="grp"><h3>'.concat(MEDS[k], '</h3><div id="l-').concat(k, '" style="display:grid;gap:6px">\n      ').concat(S.lemb[k].map((h) => '<div class="selrow"><input type="time" value="'.concat(h, '" class="lt" data-med="').concat(k, '"><button class="btn del" data-rmh="1">Remover</button></div>')).join(""), '</div>\n      <button class="btn" style="margin-top:6px" data-addh="').concat(k, '">+ Hor\xE1rio</button></div>');
+  $("sheetIn").innerHTML = '<h2>Lembretes de rem\xE9dio</h2>\n    <p class="note">Toca todo dia no hor\xE1rio escolhido. Tocar na notifica\xE7\xE3o abre o registro da dose.</p>\n    '.concat(bloco("rit")).concat(bloco("esc"), "\n    ").concat(LN ? "" : '<p class="note">Os lembretes s\xF3 tocam no app instalado no Android.</p>', '\n    <p class="note" id="exato"></p>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn" data-act="testelemb">Testar</button><button class="btn pri" data-act="salvarlemb">Salvar</button></div>');
+  $("sheet").classList.add("show");
+}
+async function agendarLembretes() {
+  if (!LN) return;
+  try {
+    await LN.requestPermissions();
+    try {
+      await LN.createChannel({ id: "remedios", name: "Lembretes de rem\xE9dio", importance: 5, visibility: 1, vibration: true });
+    } catch (e) {
+    }
+    const p = await LN.getPending();
+    const velhos = p.notifications.filter((n) => n.id >= 1e3 && n.id < 3e3);
+    if (velhos.length) await LN.cancel({ notifications: velhos.map((n) => ({ id: n.id })) });
+    const lista = [];
+    ["rit", "esc"].forEach((k, j) => S.lemb[k].forEach((h, i) => {
+      const [hour, minute] = h.split(":").map(Number);
+      lista.push({
+        id: 1e3 + j * 1e3 + i,
+        title: "Hora do " + (k === "rit" ? "Ritalina" : "Escitalopram"),
+        body: "Toque para registrar que tomou.",
+        channelId: "remedios",
+        schedule: { on: { hour, minute }, allowWhileIdle: true },
+        extra: { med: k }
+      });
+    }));
+    if (lista.length) await LN.schedule({ notifications: lista });
+    try {
+      const ex = await LN.checkExactNotificationSetting();
+      if (ex && ex.exact_alarm === "denied" && $("exato")) $("exato").innerHTML = 'O Android pode atrasar o lembrete alguns minutos. <button class="btn" data-act="exato">Permitir hor\xE1rio exato</button>';
+    } catch (e) {
+    }
+  } catch (e) {
+    toast("Erro ao agendar lembretes");
+  }
+}
+function abrirDose(k) {
+  $("sheetIn").innerHTML = "<h2>Tomei ".concat(MEDS[k], '</h2>\n    <label class="f">Dose<input type="text" id="dDose" value="').concat(esc(S.lastDose[k] || ""), '" placeholder="Ex.: 10 mg"></label>\n    <label class="f">Hor\xE1rio<input type="datetime-local" id="dQuando" value="').concat(toLocal(Date.now()), '"></label>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-savedose="').concat(k, '">Salvar</button></div>');
+  $("sheet").classList.add("show");
+}
+const HUMOR = {
+  tranquilo: "happy",
+  focado: "happy",
+  disposto: "happy",
+  sonolencia: "sleep",
+  cansaco: "sleep",
+  insonia: "sleep",
+  irritacao: "angry",
+  agitacao: "angry",
+  inquietacao: "angry",
+  ansiedade: "alert",
+  coracao: "alert",
+  distracao: "alert",
+  esquecimento: "alert",
+  procrastinacao: "alert",
+  hiperfoco: "alert",
+  tristeza: "sad",
+  desanimo: "sad",
+  choro: "sad",
+  naosair: "sad",
+  evitar: "sad",
+  apetite: "sad",
+  cabeca: "sad",
+  nausea: "sad"
+};
+const FRASE = { happy: "Que bom! Voc\xEA est\xE1 bem.", sleep: "Com sono ou cansado.", angry: "Irritado ou agitado.", alert: "Ansioso ou sem foco.", sad: "Pra baixo ou indisposto." };
+const PRIO = ["angry", "alert", "sad", "sleep", "happy"];
+function humorAtual() {
+  const e = S.entries.slice().sort((a, b) => b.t - a.t || +b.id.slice(1) - +a.id.slice(1))[0];
+  if (!e || Date.now() - e.t > 12 * H || !e.s.length) return { mood: "neutral", e: null };
+  let best = null;
+  for (const s of e.s) {
+    const m = HUMOR[s.k];
+    if (!best || s.n > best.n || s.n === best.n && PRIO.indexOf(m) < PRIO.indexOf(best.m)) best = { m, n: s.n, k: s.k };
+  }
+  return { mood: best.m, e, k: best.k, n: best.n };
+}
+function catSVG(mood) {
+  const O = "#3b2a20", W = "#fffaf2", OR = "#f2a24e";
+  const eyes = {
+    happy: '<path d="M33 48 q5 -6 10 0 M57 48 q5 -6 10 0" fill="none" stroke="'.concat(O, '" stroke-width="2.6" stroke-linecap="round"/>'),
+    alert: '<circle cx="38" cy="46" r="4.6" fill="'.concat(O, '"/><circle cx="62" cy="46" r="4.6" fill="').concat(O, '"/><circle cx="39.6" cy="44.4" r="1.5" fill="#fff"/><circle cx="63.6" cy="44.4" r="1.5" fill="#fff"/><path d="M80 30 q3 5 0 8" fill="none" stroke="#5b9bd5" stroke-width="2" stroke-linecap="round"/>'),
+    angry: '<path d="M30 38 L44 43 M70 38 L56 43" stroke="'.concat(O, '" stroke-width="2.8" stroke-linecap="round"/><circle cx="39" cy="48" r="3.4" fill="').concat(O, '"/><circle cx="61" cy="48" r="3.4" fill="').concat(O, '"/><path d="M72 22 l6 6 M78 22 l-6 6" stroke="#d63b31" stroke-width="2.4" stroke-linecap="round"/>'),
+    sleep: '<path d="M33 48 h10 M57 48 h10" stroke="'.concat(O, '" stroke-width="2.6" stroke-linecap="round"/><text x="76" y="24" font-size="12" font-weight="700" fill="#5b6b8a">z</text><text x="84" y="16" font-size="9" font-weight="700" fill="#5b6b8a">z</text>'),
+    sad: '<path d="M32 42 L44 39 M68 42 L56 39" stroke="'.concat(O, '" stroke-width="2.4" stroke-linecap="round"/><circle cx="39" cy="48" r="3.4" fill="').concat(O, '"/><circle cx="61" cy="48" r="3.4" fill="').concat(O, '"/><path d="M36 53 q-2 5 0 7 q2 -2 0 -7z" fill="#6fa8dc"/>'),
+    neutral: '<circle cx="39" cy="47" r="3.6" fill="'.concat(O, '"/><circle cx="61" cy="47" r="3.6" fill="').concat(O, '"/>'),
+    remedio: '<circle cx="38" cy="46" r="4.6" fill="'.concat(O, '"/><circle cx="62" cy="46" r="4.6" fill="').concat(O, '"/><circle cx="39.6" cy="44.4" r="1.5" fill="#fff"/><circle cx="63.6" cy="44.4" r="1.5" fill="#fff"/><text x="80" y="30" font-size="18" font-weight="800" fill="#d63b31">!</text>')
+  }[mood];
+  const prop = mood === "remedio" ? '<g transform="rotate(-20 51 80)"><rect x="37" y="74" width="28" height="12" rx="6" fill="#fff" stroke="'.concat(O, '" stroke-width="1.6"/><path d="M51 74 h8 a6 6 0 0 1 0 12 h-8 z" fill="#d63b31" stroke="').concat(O, '" stroke-width="1.6"/></g>') : '<g transform="rotate(-8 51 82)"><rect x="40" y="73" width="23" height="17" rx="2" fill="#dfe6ee" stroke="'.concat(O, '" stroke-width="1.6"/>\n      <path d="M44 78 h14 M44 82 h10 M44 86 h12" stroke="#8a97a8" stroke-width="1.3"/></g>');
+  const mouth = mood === "remedio" ? '<ellipse cx="50" cy="58" rx="3" ry="3.5" fill="'.concat(O, '"/>') : mood === "angry" || mood === "sad" ? '<path d="M45 59 q5 -4 10 0" fill="none" stroke="'.concat(O, '" stroke-width="2" stroke-linecap="round"/>') : mood === "neutral" ? '<path d="M46 57 h8" stroke="'.concat(O, '" stroke-width="2" stroke-linecap="round"/>') : '<path d="M45 56 q2.5 3 5 0 q2.5 3 5 0" fill="none" stroke="'.concat(O, '" stroke-width="1.9" stroke-linecap="round"/>');
+  return '<svg viewBox="0 0 100 100" aria-hidden="true">\n    <ellipse cx="50" cy="85" rx="27" ry="14" fill="'.concat(W, '" stroke="').concat(O, '" stroke-width="2"/>\n    <path d="M74 86 q14 -2 12 -16" fill="none" stroke="').concat(OR, '" stroke-width="5" stroke-linecap="round"/>\n    ').concat(prop, '\n    <ellipse cx="40" cy="80" rx="6" ry="4.5" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="1.6"/>\n    <ellipse cx="63" cy="77" rx="6" ry="4.5" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="1.6"/>\n    <path d="M23 35 L27 8 L46 24 Z" fill="').concat(OR, '" stroke="').concat(O, '" stroke-width="2" stroke-linejoin="round"/>\n    <path d="M77 35 L73 8 L54 24 Z" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="2" stroke-linejoin="round"/>\n    <path d="M28.5 27 L30 15 L39 23 Z" fill="#f5b9b4"/><path d="M71.5 27 L70 15 L61 23 Z" fill="#f5b9b4"/>\n    <ellipse cx="50" cy="47" rx="31" ry="25" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="2"/>\n    <path d="M21.5 42 Q23 27 40 23.5 Q37 36 21.5 42 Z" fill="').concat(OR, '"/>\n    <path d="M45 23 Q50 22 55 23 Q52 30 50 31 Q48 30 45 23 Z" fill="').concat(OR, '"/>\n    <ellipse cx="32" cy="55" rx="5" ry="3" fill="#f5a9a9" opacity=".75"/><ellipse cx="68" cy="55" rx="5" ry="3" fill="#f5a9a9" opacity=".75"/>\n    ').concat(eyes).concat(mouth, "\n  </svg>");
+}
+const ha = (ms) => ms < H ? Math.max(1, Math.round(ms / 6e4)) + " min" : hs(ms);
+function remedioPendente() {
+  const t = Date.now();
+  for (const k of ["rit", "esc"]) for (const h of S.lemb[k]) {
+    const [hh, mm] = h.split(":").map(Number);
+    for (const d of [-1, 0]) {
+      const r = /* @__PURE__ */ new Date();
+      r.setDate(r.getDate() + d);
+      r.setHours(hh, mm, 0, 0);
+      const ld = lastDoseBefore(k, t);
+      if (t >= r && t < +r + 3 * H && (!ld || ld.t < +r - 90 * 6e4)) return k;
+    }
+  }
+  return null;
+}
+const GW = CAPN && window.Capacitor.Plugins ? window.Capacitor.Plugins.GatoWidget || null : null;
+function syncWidget() {
+  if (!GW) return;
+  const h = humorAtual(), t = Date.now();
+  const last = { rit: (lastDoseBefore("rit", t) || {}).t || 0, esc: (lastDoseBefore("esc", t) || {}).t || 0 };
+  try {
+    GW.update({ state: JSON.stringify({ lemb: S.lemb, last, mood: h.mood, moodT: h.e ? h.e.t : 0, frase: h.e ? FRASE[h.mood] : "" }) }).catch(() => {
+    });
+  } catch (e) {
+  }
+}
+function renderTop() {
+  const h = humorAtual(), t = Date.now();
+  const pr = remedioPendente();
+  const ANIM = { happy: "happy", angry: "working-building", alert: "thinking", sad: "collapsing", sleep: "yawning", neutral: "idle", remedio: "notification" };
+  const anim = ANIM[pr ? "remedio" : h.mood];
+  if ($("cat").dataset.anim !== anim) {
+    $("cat").dataset.anim = anim;
+    $("cat").innerHTML = '<img src="assets/calico-'.concat(anim, '.apng" alt="">');
+  }
+  $("bubble").textContent = pr ? "Hora de tomar " + MEDS[pr] + '! Toque em "Tomei agora".' : h.e ? FRASE[h.mood] + " (" + NOME[h.k] + " " + h.n + ", h\xE1 " + ha(t - h.e.t) + ")" : "Como voc\xEA est\xE1 agora? Marque abaixo.";
+  $("pills").innerHTML = ["rit", "esc"].map((k) => {
+    const d = lastDoseBefore(k, t);
+    return "<span>".concat(MEDS[k], ": <b>").concat(d ? "h\xE1 " + ha(t - d.t) : "\u2014", "</b></span>");
+  }).join("");
+}
+function render() {
+  renderTop();
+  $("main").innerHTML = tab === "rel" ? relHTML() : tab === "hist" ? histHTML() : hojeHTML();
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+}
+function keepForm(fn) {
+  var _a, _b, _c;
+  const v = { nota: (_a = $("nota")) == null ? void 0 : _a.value, motivo: (_b = $("motivo")) == null ? void 0 : _b.value, quando: (_c = $("quando")) == null ? void 0 : _c.value };
+  fn();
+  render();
+  if ($("nota") && v.nota) $("nota").value = v.nota;
+  if ($("motivo") && v.motivo) $("motivo").value = v.motivo;
+  if ($("quando") && v.quando) $("quando").value = v.quando;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) {
+    if (e.target.id === "sheet") $("sheet").classList.remove("show");
+    return;
+  }
+  const d = b.dataset;
+  if (d.tab) {
+    tab = d.tab;
+    render();
+    window.scrollTo(0, 0);
+  } else if (d.chip) keepForm(() => {
+    if (pend[d.chip]) delete pend[d.chip];
+    else pend[d.chip] = 3;
+  });
+  else if (d.lv) keepForm(() => {
+    pend[d.lv] = +d.n;
+  });
+  else if (d.per) {
+    periodo = +d.per;
+    render();
+  } else if (d.dose) abrirDose(d.dose);
+  else if (d.savedose) {
+    const t = new Date($("dQuando").value).getTime() || Date.now(), dose = $("dDose").value.trim();
+    S.doses.push({ id: "m" + Date.now(), med: d.savedose, dose, t });
+    S.lastDose[d.savedose] = dose;
+    save();
+    $("sheet").classList.remove("show");
+    render();
+    toast(MEDS[d.savedose] + " registrada");
+  } else if (d.act === "fechar") $("sheet").classList.remove("show");
+  else if (d.act === "lembretes") abrirLembretes();
+  else if (d.act === "flutuante") {
+    if (!GW || !GW.flutuante) {
+      toast("S\xF3 funciona no app Android");
+      return;
+    }
+    try {
+      const r = await GW.flutuante({ ligar: !S.flut });
+      if (r && r.permissao === false) {
+        toast('Permita "Aparecer sobre outros apps" e toque de novo');
+        return;
+      }
+      S.flut = !!(r && r.ligado);
+      save();
+      render();
+      toast(S.flut ? "Gato flutuante ligado" : "Gato flutuante desligado");
+    } catch (err) {
+      toast("Erro: " + (err && err.message || err));
+    }
+  } else if (d.addh) {
+    const box = $("l-" + d.addh);
+    box.insertAdjacentHTML("beforeend", '<div class="selrow"><input type="time" value="08:00" class="lt" data-med="'.concat(d.addh, '"><button class="btn del" data-rmh="1">Remover</button></div>'));
+  } else if (d.rmh) b.closest(".selrow").remove();
+  else if (d.act === "salvarlemb") {
+    S.lemb = { rit: [], esc: [] };
+    document.querySelectorAll(".lt").forEach((i) => {
+      if (i.value && !S.lemb[i.dataset.med].includes(i.value)) S.lemb[i.dataset.med].push(i.value);
+    });
+    S.lemb.rit.sort();
+    S.lemb.esc.sort();
+    save();
+    await agendarLembretes();
+    if (!$("exato") || !$("exato").innerHTML) $("sheet").classList.remove("show");
+    render();
+    toast("Lembretes salvos");
+  } else if (d.act === "testelemb") {
+    if (!LN) {
+      toast("Teste s\xF3 no app Android");
+      return;
+    }
+    await LN.requestPermissions();
+    try {
+      await LN.createChannel({ id: "remedios", name: "Lembretes de rem\xE9dio", importance: 5, visibility: 1, vibration: true });
+    } catch (e2) {
+    }
+    await LN.schedule({ notifications: [{ id: 2999, title: "Hora da Ritalina (teste)", body: "Toque para registrar que tomou.", channelId: "remedios", schedule: { at: new Date(Date.now() + 5e3), allowWhileIdle: true }, extra: { med: "rit" } }] });
+    toast("Teste em 5 segundos");
+  } else if (d.act === "exato") {
+    try {
+      await LN.changeExactNotificationSetting();
+    } catch (e2) {
+    }
+    $("sheet").classList.remove("show");
+  } else if (d.act === "salvar") {
+    const s = Object.entries(pend).map(([k, n]) => ({ k, n }));
+    const nota = $("nota").value.trim();
+    if (!s.length && !nota) {
+      toast("Marque pelo menos um item");
+      return;
+    }
+    const t = new Date($("quando").value).getTime() || Date.now();
+    S.entries.push({ id: "e" + Date.now(), t, s, nota, motivo: pend.naosair && $("motivo") ? $("motivo").value.trim() : "" });
+    save();
+    pend = {};
+    render();
+    window.scrollTo(0, 0);
+    toast("Registro salvo");
+  } else if (d.act === "compartilhar") compartilhar();
+  else if (d.dele && confirm("Excluir este registro?")) {
+    S.entries = S.entries.filter((x) => x.id !== d.dele);
+    save();
+    render();
+  } else if (d.deld && confirm("Excluir esta dose?")) {
+    S.doses = S.doses.filter((x) => x.id !== d.deld);
+    save();
+    render();
+  }
+});
+render();
+syncWidget();
+if (LN) {
+  LN.addListener("localNotificationActionPerformed", (a) => {
+    const m = a.notification.extra && a.notification.extra.med;
+    if (m) {
+      tab = "hoje";
+      render();
+      abrirDose(m);
+    }
+  });
+  agendarLembretes();
+}
+setInterval(renderTop, 6e4);
+function statusFlutuante() {
+  if (!GW || !GW.status) return;
+  GW.status().then((r) => {
+    if (r && S.flut !== !!r.ligado) {
+      S.flut = !!r.ligado;
+      save();
+      if (tab === "hoje") render();
+    }
+  }).catch(() => {
+  });
+}
+statusFlutuante();
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) statusFlutuante();
+  if (!document.hidden) renderTop();
+});
+</script>
+</body>
+</html>
