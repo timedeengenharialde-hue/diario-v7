@@ -37,7 +37,7 @@ public class GatoWidget extends AppWidgetProvider {
         PendingIntent pi = PendingIntent.getActivity(ctx, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         for (int id : ids) {
             RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.gato_widget);
-            v.setImageViewResource(R.id.gato_img, g.imagemWidget());
+            v.setImageViewResource(R.id.gato_img, g.imagemWidget(ctx));
             v.setTextViewText(R.id.gato_txt, g.texto);
             v.setOnClickPendingIntent(R.id.gato_root, pi);
             mgr.updateAppWidget(id, v);

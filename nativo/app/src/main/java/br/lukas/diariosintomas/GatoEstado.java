@@ -22,12 +22,14 @@ final class GatoEstado {
             JSONObject s = new JSONObject(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("state", "{}"));
             JSONObject lemb = s.optJSONObject("lemb");
             JSONObject last = s.optJSONObject("last");
-            String[] meds = {"rit", "esc"};
-            String[] nomes = {"Ritalina", "Escitalopram"};
+            JSONObject nomes = s.optJSONObject("nomes");
             String pend = null;
-            for (int m = 0; m < 2; m++) {
-                JSONArray hs = lemb == null ? null : lemb.optJSONArray(meds[m]);
-                long ld = last == null ? 0 : last.optLong(meds[m], 0);
+            JSONArray chaves = lemb == null ? null : lemb.names();
+            for (int m = 0; chaves != null && m < chaves.length(); m++) {
+                String med = chaves.optString(m);
+                JSONArray hs = lemb.optJSONArray(med);
+                long ld = last == null ? 0 : last.optLong(med, 0);
+                String nome = nomes == null ? med : nomes.optString(med, med);
                 if (hs == null) continue;
                 for (int i = 0; i < hs.length(); i++) {
                     String[] p = hs.optString(i, "").split(":");
@@ -42,7 +44,7 @@ final class GatoEstado {
                         c.set(Calendar.SECOND, 0);
                         c.set(Calendar.MILLISECOND, 0);
                         long r = c.getTimeInMillis();
-                        if (now >= r && now < r + 3 * H && ld < r - 90 * MIN && pend == null) pend = nomes[m];
+                        if (now >= r && now < r + 3 * H && ld < r - 90 * MIN && pend == null) pend = nome;
                         if (r > now) g.proximo = Math.min(g.proximo, r);
                         if (now >= r && r + 3 * H > now) g.proximo = Math.min(g.proximo, r + 3 * H);
                     }
@@ -66,15 +68,8 @@ final class GatoEstado {
         return g;
     }
 
-    int imagemWidget() {
-        switch (mood) {
-            case "happy": return R.drawable.gato_happy;
-            case "alert": return R.drawable.gato_alert;
-            case "angry": return R.drawable.gato_angry;
-            case "sleep": return R.drawable.gato_sleep;
-            case "sad": return R.drawable.gato_sad;
-            case "remedio": return R.drawable.gato_remedio;
-            default: return R.drawable.gato_neutral;
-        }
+    int imagemWidget(Context ctx) {
+        int id = ctx.getResources().getIdentifier("gato_" + mood, "drawable", ctx.getPackageName());
+        return id != 0 ? id : ctx.getResources().getIdentifier("gato_neutral", "drawable", ctx.getPackageName());
     }
 }

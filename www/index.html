@@ -72,12 +72,12 @@ td.n{text-align:right;white-space:nowrap}
 </style>
 </head>
 <body>
-<main><div class="top"><div class="bubble" id="bubble"></div><div class="pillbox" id="pills"></div><div class="cat" id="cat"></div></div><div id="err"></div><div id="main"><div class="card">Carregando… (versão 7)</div></div></main>
+<main><div class="top"><div class="bubble" id="bubble"></div><div class="pillbox" id="pills"></div><div class="cat" id="cat"></div></div><div id="err"></div><div id="main"><div class="card">Carregando… (versão 9)</div></div></main>
 <nav>
   <button data-tab="hoje" class="on">Registrar</button>
   <button data-tab="rel">Relatório</button>
   <button data-tab="hist">Histórico</button>
-  <span style="position:absolute;right:6px;bottom:2px;font-size:9px;color:#9a9a96">v7 · <span id="bstamp">local</span></span>
+  <span style="position:absolute;right:6px;bottom:2px;font-size:9px;color:#9a9a96">v9 · <span id="bstamp">local</span></span>
 </nav>
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div class="toast" id="toast"></div>
@@ -94,6 +94,7 @@ if (!Array.prototype.flat) Array.prototype.flat = function () { return [].concat
 </script>
 <script src="build.js"></script>
 <script>
+const VERSAO = 9;
 const KEY = "diario-sintomas.v1";
 const CAPN = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const H = 36e5, D = 864e5;
@@ -106,19 +107,24 @@ const GRUPOS = [
   ["Social", [["naosair", "N\xE3o quis sair"], ["evitar", "Evitei pessoas"]]]
 ];
 const NOME = Object.fromEntries(GRUPOS.flatMap((g) => g[1]));
-const MEDS = { rit: "Ritalina", esc: "Escitalopram" };
+const MEDS_PADRAO = [{ id: "rit", nome: "Ritalina" }, { id: "esc", nome: "Escitalopram" }];
+const REF = "rit";
 let S = load();
-let tab = "hoje", pend = {}, periodo = 7;
+let tab = "hoje", pend = {}, periodo = 7, edPend = {};
 function load() {
+  let s = null;
   try {
-    const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.entries) {
-      s.lemb = s.lemb || { rit: [], esc: [] };
-      return s;
-    }
+    s = JSON.parse(localStorage.getItem(KEY));
   } catch (e) {
   }
-  return { entries: [], doses: [], lastDose: { rit: "", esc: "10 mg" }, lemb: { rit: [], esc: [] } };
+  if (!s || !s.entries) s = { entries: [], doses: [], lastDose: { rit: "", esc: "10 mg" } };
+  s.meds = s.meds || MEDS_PADRAO.slice();
+  s.lemb = s.lemb || {};
+  s.meds.forEach((m) => {
+    if (!s.lemb[m.id]) s.lemb[m.id] = [];
+  });
+  s.lastDose = s.lastDose || {};
+  return s;
 }
 function save() {
   try {
@@ -128,19 +134,40 @@ function save() {
   syncWidget();
 }
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const fmt = (t) => new Date(t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const fmtD = (t) => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const hs = (ms) => (ms / H).toFixed(1).replace(".", ",") + " h";
+const ha = (ms) => ms < H ? Math.max(1, Math.round(ms / 6e4)) + " min" : hs(ms);
 function toLocal(ms) {
   const d = new Date(ms - new Date(ms).getTimezoneOffset() * 6e4);
   return d.toISOString().slice(0, 16);
+}
+function lerData(id) {
+  const v = $(id) && $(id).value;
+  const t = v ? new Date(v).getTime() : NaN;
+  return isNaN(t) ? Date.now() : t;
 }
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 1800);
+}
+function abrirFolha(html) {
+  $("sheetIn").innerHTML = html;
+  $("sheet").classList.add("show");
+}
+function fecharFolha() {
+  $("sheet").classList.remove("show");
+}
+const medIds = () => S.meds.map((m) => m.id);
+function nomeMed(id, dose) {
+  const m = S.meds.find((x) => x.id === id);
+  if (m) return m.nome;
+  if (dose && dose.nome) return dose.nome;
+  const p = MEDS_PADRAO.find((x) => x.id === id);
+  return p ? p.nome : id;
 }
 function lastDoseBefore(med, t) {
   let best = null;
@@ -151,14 +178,17 @@ function sinceTxt(med, t) {
   const d = lastDoseBefore(med, t);
   return d ? hs(t - d.t) : null;
 }
+function chipsHTML(p, pre) {
+  const sel = Object.keys(p);
+  return GRUPOS.map(([g, it]) => '<div class="grp"><h3>'.concat(g, '</h3><div class="chips">').concat(it.map(([k, n]) => '<button class="chip '.concat(p[k] ? "on" : "", '" data-').concat(pre, 'chip="').concat(k, '">').concat(n, "</button>")).join(""), "</div></div>")).join("") + (sel.length ? '<div class="sel"><div class="note">Intensidade: 1 = leve, 5 = muito forte</div>'.concat(sel.map((k) => '<div class="selrow"><span>'.concat(NOME[k], '</span>\n      <div class="lv">').concat([1, 2, 3, 4, 5].map((n) => '<button class="'.concat(p[k] === n ? "on" : "", '" data-').concat(pre, 'lv="').concat(k, '" data-n="').concat(n, '">').concat(n, "</button>")).join(""), "</div></div>")).join(""), "</div>") : "");
+}
 function hojeHTML() {
   const t = Date.now();
-  const med = (k) => {
-    const d = lastDoseBefore(k, t);
-    return '<div class="med"><b>'.concat(MEDS[k], "</b><small>").concat(d ? "\xDAltima: " + fmt(d.t) + " (h\xE1 " + hs(t - d.t) + ")" : "Nenhum registro", '</small>\n      <button class="btn full" data-dose="').concat(k, '">Tomei agora</button></div>');
+  const card = (m) => {
+    const d = lastDoseBefore(m.id, t);
+    return '<div class="med"><b>'.concat(esc(m.nome), "</b><small>").concat(d ? "\xDAltima: " + fmt(d.t) + " (h\xE1 " + hs(t - d.t) + ")" : "Nenhum registro", '</small>\n      <button class="btn full" data-dose="').concat(m.id, '">Tomei agora</button></div>');
   };
-  const sel = Object.keys(pend);
-  return '  <div class="card"><h2>Rem\xE9dios</h2><div class="meds">'.concat(med("rit")).concat(med("esc"), '</div>\n    <div class="row2"><button class="btn full" data-act="lembretes">\u23F0 Lembretes: ').concat(lembResumo(), '</button></div>\n    <div class="row2"><button class="btn full" data-act="flutuante">\u{1F431} Gato flutuante na tela: ').concat(S.flut ? "ligado" : "desligado", '</button></div>\n    <p class="note">Aqui s\xF3 se registra o que voc\xEA tomou. Mudan\xE7a de dose, s\xF3 com quem prescreve.</p></div>\n  <div class="card">\n    ').concat(GRUPOS.map(([g, it]) => '<div class="grp"><h3>'.concat(g, '</h3><div class="chips">').concat(it.map(([k, n]) => '<button class="chip '.concat(pend[k] ? "on" : "", '" data-chip="').concat(k, '">').concat(n, "</button>")).join(""), "</div></div>")).join(""), "\n    ").concat(sel.length ? '<div class="sel"><div class="note">Intensidade: 1 = leve, 5 = muito forte</div>'.concat(sel.map((k) => '<div class="selrow"><span>'.concat(NOME[k], '</span>\n      <div class="lv">').concat([1, 2, 3, 4, 5].map((n) => '<button class="'.concat(pend[k] === n ? "on" : "", '" data-lv="').concat(k, '" data-n="').concat(n, '">').concat(n, "</button>")).join(""), "</div></div>")).join(""), "</div>") : "", "\n    ").concat(pend.naosair ? '<label class="f">Por que n\xE3o quis sair?<input type="text" id="motivo" placeholder="Ex.: cansado, sem vontade de ver gente, chuva"></label>' : "", '\n    <label class="f">Anota\xE7\xE3o (opcional)<textarea id="nota" placeholder="O que aconteceu, onde estava, o que ajudou"></textarea></label>\n    <label class="f">Quando<input type="datetime-local" id="quando" value="').concat(toLocal(t), '"></label>\n    <div class="row2"><button class="btn pri" data-act="salvar">Salvar registro</button></div>\n  </div>\n  <p class="note" style="color:#9a9a96;text-align:center">Vers\xE3o 7 \xB7 build ').concat(window.BUILD || "local", "</p>");
+  return '<div class="card"><h2>Rem\xE9dios</h2><div class="meds">'.concat(S.meds.map(card).join(""), '</div>\n    <div class="row2"><button class="btn full" data-act="remedios">\u{1F48A} Editar rem\xE9dios</button></div>\n    <div class="row2"><button class="btn full" data-act="lembretes">\u23F0 Lembretes: ').concat(lembResumo(), '</button></div>\n    <div class="row2"><button class="btn full" data-act="flutuante">\u{1F431} Gato flutuante na tela: ').concat(S.flut ? "ligado" : "desligado", '</button></div>\n    <p class="note">Aqui s\xF3 se registra o que voc\xEA tomou. Mudan\xE7a de dose, s\xF3 com quem prescreve.</p></div>\n  <div class="card">').concat(chipsHTML(pend, ""), "\n    ").concat(pend.naosair ? '<label class="f">Por que n\xE3o quis sair?<input type="text" id="motivo" placeholder="Ex.: cansado, sem vontade de ver gente, chuva"></label>' : "", '\n    <label class="f">Anota\xE7\xE3o (opcional)<textarea id="nota" placeholder="O que aconteceu, onde estava, o que ajudou"></textarea></label>\n    <label class="f">Quando<input type="datetime-local" id="quando" value="').concat(toLocal(t), '"></label>\n    <div class="row2"><button class="btn pri" data-act="salvar">Salvar registro</button></div>\n  </div>\n  <p class="note" style="color:#9a9a96;text-align:center">Vers\xE3o ').concat(VERSAO, " \xB7 build ").concat(window.BUILD || "local", "</p>");
 }
 function stats() {
   const ini = Date.now() - periodo * D;
@@ -166,59 +196,52 @@ function stats() {
   const doses = S.doses.filter((d) => d.t >= ini).sort((a, b) => a.t - b.t);
   const por = {};
   for (const e of ents) for (const s of e.s) {
-    const p = por[s.k] || (por[s.k] = { n: 0, soma: 0, rit: [] });
+    const p = por[s.k] || (por[s.k] = { n: 0, soma: 0, ref: [] });
     p.n++;
     p.soma += s.n;
-    const r = lastDoseBefore("rit", e.t);
-    if (r && e.t - r.t < 24 * H) p.rit.push(e.t - r.t);
+    const r = lastDoseBefore(REF, e.t);
+    if (r && e.t - r.t < 24 * H) p.ref.push(e.t - r.t);
   }
   const lista = Object.entries(por).sort((a, b) => b[1].n - a[1].n);
-  return { ini, ents, doses, lista };
+  const medsNoPeriodo = medIds().concat([...new Set(doses.map((d) => d.med))].filter((id) => !medIds().includes(id)));
+  return { ini, ents, doses, lista, medsNoPeriodo };
 }
+const media = (a) => a.length ? hs(a.reduce((x, y) => x + y, 0) / a.length) : "\u2014";
 function relHTML() {
-  const { ents, doses, lista } = stats();
-  const nd = (k) => doses.filter((d) => d.med === k);
-  const media = (a) => a.length ? hs(a.reduce((x, y) => x + y, 0) / a.length) : "\u2014";
+  const { ents, doses, lista, medsNoPeriodo } = stats();
   const motivos = ents.filter((e) => e.motivo);
-  return '<h1>Relat\xF3rio</h1>\n  <div class="seg">'.concat([7, 14, 30].map((p) => '<button class="'.concat(periodo === p ? "on" : "", '" data-per="').concat(p, '">').concat(p, " dias</button>")).join(""), '</div>\n  <div class="card"><h2>Rem\xE9dios no per\xEDodo</h2>\n    <table><tr><th>Rem\xE9dio</th><th class="n">Vezes</th><th class="n">Dias com dose</th></tr>\n    ').concat(["rit", "esc"].map((k) => {
-    const l = nd(k);
+  const refNome = nomeMed(REF);
+  return '<h1>Relat\xF3rio</h1>\n  <div class="seg">'.concat([7, 14, 30].map((p) => '<button class="'.concat(periodo === p ? "on" : "", '" data-per="').concat(p, '">').concat(p, " dias</button>")).join(""), '</div>\n  <div class="card"><h2>Rem\xE9dios no per\xEDodo</h2>\n    <table><tr><th>Rem\xE9dio</th><th class="n">Vezes</th><th class="n">Dias com dose</th></tr>\n    ').concat(medsNoPeriodo.map((k) => {
+    const l = doses.filter((d) => d.med === k);
     const dias = new Set(l.map((d) => fmtD(d.t))).size;
-    return "<tr><td>".concat(MEDS[k], '</td><td class="n">').concat(l.length, '</td><td class="n">').concat(dias, " de ").concat(periodo, "</td></tr>");
-  }).join(""), '</table></div>\n  <div class="card"><h2>Sintomas mais frequentes</h2>\n    ').concat(lista.length ? '<table><tr><th>Sintoma</th><th class="n">Vezes</th><th class="n">Intens.</th><th class="n">Ap\xF3s Ritalina</th></tr>\n    '.concat(lista.map(([k, p]) => "<tr><td>".concat(NOME[k], '</td><td class="n">').concat(p.n, '</td><td class="n">').concat((p.soma / p.n).toFixed(1).replace(".", ","), '</td><td class="n">').concat(media(p.rit), "</td></tr>")).join(""), '</table>\n    <p class="note">"Ap\xF3s Ritalina" = tempo m\xE9dio entre a \xFAltima dose e o registro (s\xF3 conta at\xE9 24 h).</p>') : '<p class="note">Nenhum registro neste per\xEDodo.</p>', "</div>\n  ").concat(motivos.length ? '<div class="card"><h2>Por que n\xE3o quis sair</h2>'.concat(motivos.map((e) => '<div class="entry"><div class="h">'.concat(fmt(e.t), '</div><div class="b">').concat(esc(e.motivo), "</div></div>")).join(""), "</div>") : "", '\n  <button class="btn pri full" data-act="compartilhar">Enviar relat\xF3rio (WhatsApp, e-mail\u2026)</button>');
+    return "<tr><td>".concat(esc(nomeMed(k, l[0])), '</td><td class="n">').concat(l.length, '</td><td class="n">').concat(dias, " de ").concat(periodo, "</td></tr>");
+  }).join(""), '</table></div>\n  <div class="card"><h2>Sintomas mais frequentes</h2>\n    ').concat(lista.length ? '<table><tr><th>Sintoma</th><th class="n">Vezes</th><th class="n">Intens.</th><th class="n">Ap\xF3s '.concat(esc(refNome), "</th></tr>\n    ").concat(lista.map(([k, p]) => "<tr><td>".concat(NOME[k], '</td><td class="n">').concat(p.n, '</td><td class="n">').concat((p.soma / p.n).toFixed(1).replace(".", ","), '</td><td class="n">').concat(media(p.ref), "</td></tr>")).join(""), '</table>\n    <p class="note">"Ap\xF3s ').concat(esc(refNome), '" = tempo m\xE9dio entre a \xFAltima dose e o registro (s\xF3 conta at\xE9 24 h).</p>') : '<p class="note">Nenhum registro neste per\xEDodo.</p>', "</div>\n  ").concat(motivos.length ? '<div class="card"><h2>Por que n\xE3o quis sair</h2>'.concat(motivos.map((e) => '<div class="entry"><div class="h">'.concat(fmt(e.t), '</div><div class="b">').concat(esc(e.motivo), "</div></div>")).join(""), "</div>") : "", '\n  <button class="btn pri full" data-act="compartilhar">Enviar relat\xF3rio (WhatsApp, e-mail\u2026)</button>');
 }
 function relTexto() {
-  const { ini, ents, doses, lista } = stats();
-  const L = [];
-  L.push("DI\xC1RIO DE SINTOMAS: " + fmtD(ini) + " a " + fmtD(Date.now()));
-  L.push("");
-  L.push("REM\xC9DIOS");
-  for (const k of ["rit", "esc"]) {
+  const { ini, ents, doses, lista, medsNoPeriodo } = stats();
+  const refNome = nomeMed(REF);
+  const L = ["DI\xC1RIO DE SINTOMAS: " + fmtD(ini) + " a " + fmtD(Date.now()), "", "REM\xC9DIOS"];
+  for (const k of medsNoPeriodo) {
     const l = doses.filter((d) => d.med === k);
-    L.push("- " + MEDS[k] + ": " + l.length + " dose(s), em " + new Set(l.map((d) => fmtD(d.t))).size + " de " + periodo + " dias");
+    L.push("- " + nomeMed(k, l[0]) + ": " + l.length + " dose(s), em " + new Set(l.map((d) => fmtD(d.t))).size + " de " + periodo + " dias");
   }
-  L.push("");
-  L.push("SINTOMAS (vezes | intensidade m\xE9dia 1-5 | tempo m\xE9dio ap\xF3s Ritalina)");
+  L.push("", "SINTOMAS (vezes | intensidade m\xE9dia 1-5 | tempo m\xE9dio ap\xF3s " + refNome + ")");
   if (!lista.length) L.push("- nenhum registro");
-  for (const [k, p] of lista) {
-    const m = p.rit.length ? hs(p.rit.reduce((x, y) => x + y, 0) / p.rit.length) : "-";
-    L.push("- " + NOME[k] + ": " + p.n + "x | " + (p.soma / p.n).toFixed(1).replace(".", ",") + " | " + m);
-  }
+  for (const [k, p] of lista) L.push("- " + NOME[k] + ": " + p.n + "x | " + (p.soma / p.n).toFixed(1).replace(".", ",") + " | " + (p.ref.length ? media(p.ref) : "-"));
   const mot = ents.filter((e) => e.motivo);
   if (mot.length) {
-    L.push("");
-    L.push("POR QUE N\xC3O QUIS SAIR");
+    L.push("", "POR QUE N\xC3O QUIS SAIR");
     mot.forEach((e) => L.push("- " + fmt(e.t) + ": " + e.motivo));
   }
-  L.push("");
-  L.push("REGISTROS");
+  L.push("", "REGISTROS");
   const tudo = [...ents.map((e) => ({ t: e.t, e })), ...doses.map((d) => ({ t: d.t, d }))].sort((a, b) => a.t - b.t);
   for (const x of tudo) {
     if (x.d) {
-      L.push(fmt(x.t) + " | TOMOU " + MEDS[x.d.med] + (x.d.dose ? " " + x.d.dose : ""));
+      L.push(fmt(x.t) + " | TOMOU " + nomeMed(x.d.med, x.d) + (x.d.dose ? " " + x.d.dose : ""));
       continue;
     }
-    const e = x.e, r = sinceTxt("rit", e.t);
-    L.push(fmt(e.t) + (r ? " | Ritalina h\xE1 " + r : "") + " | " + e.s.map((s) => NOME[s.k] + " " + s.n).join(", ") + (e.nota ? " | " + e.nota : ""));
+    const e = x.e, r = sinceTxt(REF, e.t);
+    L.push(fmt(e.t) + (r ? " | " + refNome + " h\xE1 " + r : "") + " | " + e.s.map((s) => NOME[s.k] + " " + s.n).join(", ") + (e.nota ? " | " + e.nota : ""));
   }
   return L.join("\n");
 }
@@ -245,22 +268,51 @@ async function compartilhar() {
   }
 }
 function histHTML() {
-  const tudo = [...S.entries.map((e) => ({ t: e.t, e })), ...S.doses.map((d) => ({ t: d.t, d }))].sort((a, b) => b.t - a.t).slice(0, 200);
+  const tudo = [...S.entries.map((e) => ({ t: e.t, e })), ...S.doses.map((d) => ({ t: d.t, d }))].sort((a, b) => b.t - a.t).slice(0, 300);
   return '<h1>Hist\xF3rico</h1><div class="card">'.concat(tudo.length ? tudo.map((x) => {
-    if (x.d) return '<div class="entry"><div class="h"><span>'.concat(fmt(x.t), '<span class="tag med">').concat(MEDS[x.d.med], " ").concat(esc(x.d.dose || ""), '</span></span>\n      <button class="btn del" data-deld="').concat(x.d.id, '">Excluir</button></div></div>');
-    const e = x.e, r = sinceTxt("rit", e.t);
-    return '<div class="entry"><div class="h"><span>'.concat(fmt(e.t)).concat(r ? '<span class="tag">Ritalina h\xE1 '.concat(r, "</span>") : "", '</span>\n      <button class="btn del" data-dele="').concat(e.id, '">Excluir</button></div>\n      <div class="b">').concat(e.s.map((s) => esc(NOME[s.k]) + " " + s.n).join(", ")).concat(e.motivo ? "<br><i>N\xE3o quis sair: " + esc(e.motivo) + "</i>" : "").concat(e.nota ? "<br>" + esc(e.nota) : "", "</div></div>");
+    if (x.d) return '<div class="entry"><div class="h"><span>'.concat(fmt(x.t), '<span class="tag med">').concat(esc(nomeMed(x.d.med, x.d)), " ").concat(esc(x.d.dose || ""), '</span></span>\n      <button class="btn del" style="color:var(--pri)" data-edd="').concat(x.d.id, '">Editar</button></div></div>');
+    const e = x.e, r = sinceTxt(REF, e.t);
+    return '<div class="entry"><div class="h"><span>'.concat(fmt(e.t)).concat(r ? '<span class="tag">'.concat(esc(nomeMed(REF)), " h\xE1 ").concat(r, "</span>") : "", '</span>\n      <button class="btn del" style="color:var(--pri)" data-ede="').concat(e.id, '">Editar</button></div>\n      <div class="b">').concat(e.s.map((s) => esc(NOME[s.k]) + " " + s.n).join(", ")).concat(e.motivo ? "<br><i>N\xE3o quis sair: " + esc(e.motivo) + "</i>" : "").concat(e.nota ? "<br>" + esc(e.nota) : "", "</div></div>");
   }).join("") : '<p class="note">Nenhum registro ainda. Comece em Registrar.</p>', "</div>");
 }
-const LN = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() ? window.Capacitor.Plugins.LocalNotifications : null;
+function editarRegistroHTML(e, v) {
+  v = v || { quando: toLocal(e.t), nota: e.nota || "", motivo: e.motivo || "" };
+  return '<h2>Editar registro</h2>\n    <label class="f">Quando<input type="datetime-local" id="eQuando" value="'.concat(esc(v.quando), '"></label>\n    <div style="max-height:45vh;overflow:auto;margin-top:8px">').concat(chipsHTML(edPend, "e"), "</div>\n    ").concat(edPend.naosair ? '<label class="f">Por que n\xE3o quis sair?<input type="text" id="eMotivo" value="'.concat(esc(v.motivo), '"></label>') : "", '\n    <label class="f">Anota\xE7\xE3o<textarea id="eNota">').concat(esc(v.nota), '</textarea></label>\n    <div class="row2"><button class="btn del" data-dele="').concat(e.id, '">Excluir</button><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-salvae="').concat(e.id, '">Salvar</button></div>');
+}
+function abrirEdicaoRegistro(id) {
+  const e = S.entries.find((x) => x.id === id);
+  if (!e) return;
+  edPend = {};
+  e.s.forEach((s) => edPend[s.k] = s.n);
+  abrirFolha(editarRegistroHTML(e));
+}
+function redesenharEdicao(id) {
+  const e = S.entries.find((x) => x.id === id);
+  if (!e) return;
+  const v = { quando: $("eQuando").value, nota: $("eNota").value, motivo: $("eMotivo") ? $("eMotivo").value : e.motivo || "" };
+  const sc = $("sheetIn").querySelector('div[style*="overflow"]'), top = sc ? sc.scrollTop : 0;
+  $("sheetIn").innerHTML = editarRegistroHTML(e, v);
+  const sc2 = $("sheetIn").querySelector('div[style*="overflow"]');
+  if (sc2) sc2.scrollTop = top;
+}
+function abrirEdicaoDose(id) {
+  const d = S.doses.find((x) => x.id === id);
+  if (!d) return;
+  const opts = S.meds.map((m) => '<option value="'.concat(m.id, '" ').concat(m.id === d.med ? "selected" : "", ">").concat(esc(m.nome), "</option>")).join("") + (S.meds.some((m) => m.id === d.med) ? "" : '<option value="'.concat(esc(d.med), '" selected>').concat(esc(nomeMed(d.med, d)), "</option>"));
+  abrirFolha('<h2>Editar dose</h2>\n    <label class="f">Rem\xE9dio<select id="xMed">'.concat(opts, '</select></label>\n    <label class="f">Dose<input type="text" id="xDose" value="').concat(esc(d.dose || ""), '" placeholder="Ex.: 10 mg"></label>\n    <label class="f">Hor\xE1rio<input type="datetime-local" id="xQuando" value="').concat(toLocal(d.t), '"></label>\n    <div class="row2"><button class="btn del" data-deld="').concat(d.id, '">Excluir</button><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-salvad="').concat(d.id, '">Salvar</button></div>'));
+}
+function abrirRemedios() {
+  abrirFolha('<h2>Rem\xE9dios</h2>\n    <p class="note">Mude o nome, adicione ou remova. O hist\xF3rico de um rem\xE9dio removido continua guardado.</p>\n    <div id="listaMeds" style="display:grid;gap:8px;margin-top:8px">'.concat(S.meds.map((m) => linhaMed(m.id, m.nome)).join(""), '</div>\n    <button class="btn" style="margin-top:8px" data-act="addmed">+ Adicionar rem\xE9dio</button>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-act="salvarmeds">Salvar</button></div>'));
+}
+const linhaMed = (id, nome) => '<div class="selrow"><input type="text" class="mn" data-id="'.concat(esc(id), '" value="').concat(esc(nome), '" placeholder="Nome do rem\xE9dio"><button class="btn del" data-rmmed="1">Remover</button></div>');
+const LN = CAPN ? window.Capacitor.Plugins.LocalNotifications : null;
 function lembResumo() {
-  const r = ["rit", "esc"].filter((k) => S.lemb[k].length).map((k) => MEDS[k] + " " + S.lemb[k].join(", "));
-  return r.length ? r.join(" \xB7 ") : "nenhum";
+  const r = S.meds.filter((m) => (S.lemb[m.id] || []).length).map((m) => m.nome + " " + S.lemb[m.id].join(", "));
+  return r.length ? esc(r.join(" \xB7 ")) : "nenhum";
 }
 function abrirLembretes() {
-  const bloco = (k) => '<div class="grp"><h3>'.concat(MEDS[k], '</h3><div id="l-').concat(k, '" style="display:grid;gap:6px">\n      ').concat(S.lemb[k].map((h) => '<div class="selrow"><input type="time" value="'.concat(h, '" class="lt" data-med="').concat(k, '"><button class="btn del" data-rmh="1">Remover</button></div>')).join(""), '</div>\n      <button class="btn" style="margin-top:6px" data-addh="').concat(k, '">+ Hor\xE1rio</button></div>');
-  $("sheetIn").innerHTML = '<h2>Lembretes de rem\xE9dio</h2>\n    <p class="note">Toca todo dia no hor\xE1rio escolhido. Tocar na notifica\xE7\xE3o abre o registro da dose.</p>\n    '.concat(bloco("rit")).concat(bloco("esc"), "\n    ").concat(LN ? "" : '<p class="note">Os lembretes s\xF3 tocam no app instalado no Android.</p>', '\n    <p class="note" id="exato"></p>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn" data-act="testelemb">Testar</button><button class="btn pri" data-act="salvarlemb">Salvar</button></div>');
-  $("sheet").classList.add("show");
+  const bloco = (m) => '<div class="grp"><h3>'.concat(esc(m.nome), '</h3><div id="l-').concat(m.id, '" style="display:grid;gap:6px">\n      ').concat((S.lemb[m.id] || []).map((h) => '<div class="selrow"><input type="time" value="'.concat(h, '" class="lt" data-med="').concat(m.id, '"><button class="btn del" data-rmh="1">Remover</button></div>')).join(""), '</div>\n      <button class="btn" style="margin-top:6px" data-addh="').concat(m.id, '">+ Hor\xE1rio</button></div>');
+  abrirFolha('<h2>Lembretes de rem\xE9dio</h2>\n    <p class="note">Toca todo dia no hor\xE1rio escolhido. Tocar na notifica\xE7\xE3o abre o registro da dose.</p>\n    <div style="max-height:50vh;overflow:auto">'.concat(S.meds.map(bloco).join(""), "</div>\n    ").concat(LN ? "" : '<p class="note">Os lembretes s\xF3 tocam no app instalado no Android.</p>', '\n    <p class="note" id="exato"></p>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn" data-act="testelemb">Testar</button><button class="btn pri" data-act="salvarlemb">Salvar</button></div>'));
 }
 async function agendarLembretes() {
   if (!LN) return;
@@ -274,15 +326,15 @@ async function agendarLembretes() {
     const velhos = p.notifications.filter((n) => n.id >= 1e3 && n.id < 3e3);
     if (velhos.length) await LN.cancel({ notifications: velhos.map((n) => ({ id: n.id })) });
     const lista = [];
-    ["rit", "esc"].forEach((k, j) => S.lemb[k].forEach((h, i) => {
+    S.meds.forEach((m, j) => (S.lemb[m.id] || []).forEach((h, i) => {
       const [hour, minute] = h.split(":").map(Number);
       lista.push({
-        id: 1e3 + j * 1e3 + i,
-        title: "Hora do " + (k === "rit" ? "Ritalina" : "Escitalopram"),
+        id: 1e3 + j * 100 + i,
+        title: "Hora de tomar " + m.nome,
         body: "Toque para registrar que tomou.",
         channelId: "remedios",
         schedule: { on: { hour, minute }, allowWhileIdle: true },
-        extra: { med: k }
+        extra: { med: m.id }
       });
     }));
     if (lista.length) await LN.schedule({ notifications: lista });
@@ -296,36 +348,43 @@ async function agendarLembretes() {
   }
 }
 function abrirDose(k) {
-  $("sheetIn").innerHTML = "<h2>Tomei ".concat(MEDS[k], '</h2>\n    <label class="f">Dose<input type="text" id="dDose" value="').concat(esc(S.lastDose[k] || ""), '" placeholder="Ex.: 10 mg"></label>\n    <label class="f">Hor\xE1rio<input type="datetime-local" id="dQuando" value="').concat(toLocal(Date.now()), '"></label>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-savedose="').concat(k, '">Salvar</button></div>');
-  $("sheet").classList.add("show");
+  abrirFolha("<h2>Tomei ".concat(esc(nomeMed(k)), '</h2>\n    <label class="f">Dose<input type="text" id="dDose" value="').concat(esc(S.lastDose[k] || ""), '" placeholder="Ex.: 10 mg"></label>\n    <label class="f">Hor\xE1rio<input type="datetime-local" id="dQuando" value="').concat(toLocal(Date.now()), '"></label>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-savedose="').concat(k, '">Salvar</button></div>'));
 }
 const HUMOR = {
-  tranquilo: "happy",
-  focado: "happy",
-  disposto: "happy",
-  sonolencia: "sleep",
-  cansaco: "sleep",
-  insonia: "sleep",
-  irritacao: "angry",
-  agitacao: "angry",
-  inquietacao: "angry",
-  ansiedade: "alert",
-  coracao: "alert",
-  distracao: "alert",
-  esquecimento: "alert",
-  procrastinacao: "alert",
-  hiperfoco: "alert",
-  tristeza: "sad",
-  desanimo: "sad",
-  choro: "sad",
-  naosair: "sad",
-  evitar: "sad",
-  apetite: "sad",
-  cabeca: "sad",
-  nausea: "sad"
+  tranquilo: "feliz",
+  focado: "feliz",
+  disposto: "feliz",
+  sonolencia: "sono",
+  cansaco: "sono",
+  insonia: "sono",
+  irritacao: "irritado",
+  agitacao: "irritado",
+  ansiedade: "ansioso",
+  coracao: "ansioso",
+  inquietacao: "ansioso",
+  distracao: "semfoco",
+  esquecimento: "semfoco",
+  procrastinacao: "semfoco",
+  hiperfoco: "semfoco",
+  tristeza: "triste",
+  desanimo: "triste",
+  choro: "triste",
+  naosair: "triste",
+  evitar: "triste",
+  apetite: "indisposto",
+  cabeca: "indisposto",
+  nausea: "indisposto"
 };
-const FRASE = { happy: "Que bom! Voc\xEA est\xE1 bem.", sleep: "Com sono ou cansado.", angry: "Irritado ou agitado.", alert: "Ansioso ou sem foco.", sad: "Pra baixo ou indisposto." };
-const PRIO = ["angry", "alert", "sad", "sleep", "happy"];
+const FRASE = {
+  feliz: "Que bom! Voc\xEA est\xE1 bem.",
+  sono: "Com sono ou cansado.",
+  irritado: "Irritado ou agitado.",
+  ansioso: "Ansioso ou inquieto.",
+  semfoco: "Dif\xEDcil manter o foco.",
+  triste: "Pra baixo, dia nublado.",
+  indisposto: "O corpo n\xE3o est\xE1 legal."
+};
+const PRIO = ["irritado", "ansioso", "triste", "indisposto", "semfoco", "sono", "feliz"];
 function humorAtual() {
   const e = S.entries.slice().sort((a, b) => b.t - a.t || +b.id.slice(1) - +a.id.slice(1))[0];
   if (!e || Date.now() - e.t > 12 * H || !e.s.length) return { mood: "neutral", e: null };
@@ -336,32 +395,16 @@ function humorAtual() {
   }
   return { mood: best.m, e, k: best.k, n: best.n };
 }
-function catSVG(mood) {
-  const O = "#3b2a20", W = "#fffaf2", OR = "#f2a24e";
-  const eyes = {
-    happy: '<path d="M33 48 q5 -6 10 0 M57 48 q5 -6 10 0" fill="none" stroke="'.concat(O, '" stroke-width="2.6" stroke-linecap="round"/>'),
-    alert: '<circle cx="38" cy="46" r="4.6" fill="'.concat(O, '"/><circle cx="62" cy="46" r="4.6" fill="').concat(O, '"/><circle cx="39.6" cy="44.4" r="1.5" fill="#fff"/><circle cx="63.6" cy="44.4" r="1.5" fill="#fff"/><path d="M80 30 q3 5 0 8" fill="none" stroke="#5b9bd5" stroke-width="2" stroke-linecap="round"/>'),
-    angry: '<path d="M30 38 L44 43 M70 38 L56 43" stroke="'.concat(O, '" stroke-width="2.8" stroke-linecap="round"/><circle cx="39" cy="48" r="3.4" fill="').concat(O, '"/><circle cx="61" cy="48" r="3.4" fill="').concat(O, '"/><path d="M72 22 l6 6 M78 22 l-6 6" stroke="#d63b31" stroke-width="2.4" stroke-linecap="round"/>'),
-    sleep: '<path d="M33 48 h10 M57 48 h10" stroke="'.concat(O, '" stroke-width="2.6" stroke-linecap="round"/><text x="76" y="24" font-size="12" font-weight="700" fill="#5b6b8a">z</text><text x="84" y="16" font-size="9" font-weight="700" fill="#5b6b8a">z</text>'),
-    sad: '<path d="M32 42 L44 39 M68 42 L56 39" stroke="'.concat(O, '" stroke-width="2.4" stroke-linecap="round"/><circle cx="39" cy="48" r="3.4" fill="').concat(O, '"/><circle cx="61" cy="48" r="3.4" fill="').concat(O, '"/><path d="M36 53 q-2 5 0 7 q2 -2 0 -7z" fill="#6fa8dc"/>'),
-    neutral: '<circle cx="39" cy="47" r="3.6" fill="'.concat(O, '"/><circle cx="61" cy="47" r="3.6" fill="').concat(O, '"/>'),
-    remedio: '<circle cx="38" cy="46" r="4.6" fill="'.concat(O, '"/><circle cx="62" cy="46" r="4.6" fill="').concat(O, '"/><circle cx="39.6" cy="44.4" r="1.5" fill="#fff"/><circle cx="63.6" cy="44.4" r="1.5" fill="#fff"/><text x="80" y="30" font-size="18" font-weight="800" fill="#d63b31">!</text>')
-  }[mood];
-  const prop = mood === "remedio" ? '<g transform="rotate(-20 51 80)"><rect x="37" y="74" width="28" height="12" rx="6" fill="#fff" stroke="'.concat(O, '" stroke-width="1.6"/><path d="M51 74 h8 a6 6 0 0 1 0 12 h-8 z" fill="#d63b31" stroke="').concat(O, '" stroke-width="1.6"/></g>') : '<g transform="rotate(-8 51 82)"><rect x="40" y="73" width="23" height="17" rx="2" fill="#dfe6ee" stroke="'.concat(O, '" stroke-width="1.6"/>\n      <path d="M44 78 h14 M44 82 h10 M44 86 h12" stroke="#8a97a8" stroke-width="1.3"/></g>');
-  const mouth = mood === "remedio" ? '<ellipse cx="50" cy="58" rx="3" ry="3.5" fill="'.concat(O, '"/>') : mood === "angry" || mood === "sad" ? '<path d="M45 59 q5 -4 10 0" fill="none" stroke="'.concat(O, '" stroke-width="2" stroke-linecap="round"/>') : mood === "neutral" ? '<path d="M46 57 h8" stroke="'.concat(O, '" stroke-width="2" stroke-linecap="round"/>') : '<path d="M45 56 q2.5 3 5 0 q2.5 3 5 0" fill="none" stroke="'.concat(O, '" stroke-width="1.9" stroke-linecap="round"/>');
-  return '<svg viewBox="0 0 100 100" aria-hidden="true">\n    <ellipse cx="50" cy="85" rx="27" ry="14" fill="'.concat(W, '" stroke="').concat(O, '" stroke-width="2"/>\n    <path d="M74 86 q14 -2 12 -16" fill="none" stroke="').concat(OR, '" stroke-width="5" stroke-linecap="round"/>\n    ').concat(prop, '\n    <ellipse cx="40" cy="80" rx="6" ry="4.5" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="1.6"/>\n    <ellipse cx="63" cy="77" rx="6" ry="4.5" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="1.6"/>\n    <path d="M23 35 L27 8 L46 24 Z" fill="').concat(OR, '" stroke="').concat(O, '" stroke-width="2" stroke-linejoin="round"/>\n    <path d="M77 35 L73 8 L54 24 Z" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="2" stroke-linejoin="round"/>\n    <path d="M28.5 27 L30 15 L39 23 Z" fill="#f5b9b4"/><path d="M71.5 27 L70 15 L61 23 Z" fill="#f5b9b4"/>\n    <ellipse cx="50" cy="47" rx="31" ry="25" fill="').concat(W, '" stroke="').concat(O, '" stroke-width="2"/>\n    <path d="M21.5 42 Q23 27 40 23.5 Q37 36 21.5 42 Z" fill="').concat(OR, '"/>\n    <path d="M45 23 Q50 22 55 23 Q52 30 50 31 Q48 30 45 23 Z" fill="').concat(OR, '"/>\n    <ellipse cx="32" cy="55" rx="5" ry="3" fill="#f5a9a9" opacity=".75"/><ellipse cx="68" cy="55" rx="5" ry="3" fill="#f5a9a9" opacity=".75"/>\n    ').concat(eyes).concat(mouth, "\n  </svg>");
-}
-const ha = (ms) => ms < H ? Math.max(1, Math.round(ms / 6e4)) + " min" : hs(ms);
 function remedioPendente() {
   const t = Date.now();
-  for (const k of ["rit", "esc"]) for (const h of S.lemb[k]) {
+  for (const m of S.meds) for (const h of S.lemb[m.id] || []) {
     const [hh, mm] = h.split(":").map(Number);
     for (const d of [-1, 0]) {
       const r = /* @__PURE__ */ new Date();
       r.setDate(r.getDate() + d);
       r.setHours(hh, mm, 0, 0);
-      const ld = lastDoseBefore(k, t);
-      if (t >= r && t < +r + 3 * H && (!ld || ld.t < +r - 90 * 6e4)) return k;
+      const ld = lastDoseBefore(m.id, t);
+      if (t >= r && t < +r + 3 * H && (!ld || ld.t < +r - 90 * 6e4)) return m.id;
     }
   }
   return null;
@@ -369,27 +412,28 @@ function remedioPendente() {
 const GW = CAPN && window.Capacitor.Plugins ? window.Capacitor.Plugins.GatoWidget || null : null;
 function syncWidget() {
   if (!GW) return;
-  const h = humorAtual(), t = Date.now();
-  const last = { rit: (lastDoseBefore("rit", t) || {}).t || 0, esc: (lastDoseBefore("esc", t) || {}).t || 0 };
+  const h = humorAtual(), t = Date.now(), last = {}, nomes = {};
+  S.meds.forEach((m) => {
+    last[m.id] = (lastDoseBefore(m.id, t) || {}).t || 0;
+    nomes[m.id] = m.nome;
+  });
   try {
-    GW.update({ state: JSON.stringify({ lemb: S.lemb, last, mood: h.mood, moodT: h.e ? h.e.t : 0, frase: h.e ? FRASE[h.mood] : "" }) }).catch(() => {
+    GW.update({ state: JSON.stringify({ lemb: S.lemb, last, nomes, mood: h.mood, moodT: h.e ? h.e.t : 0, frase: h.e ? FRASE[h.mood] : "" }) }).catch(() => {
     });
   } catch (e) {
   }
 }
 function renderTop() {
-  const h = humorAtual(), t = Date.now();
-  const pr = remedioPendente();
-  const ANIM = { happy: "happy", angry: "working-building", alert: "thinking", sad: "collapsing", sleep: "yawning", neutral: "idle", remedio: "notification" };
-  const anim = ANIM[pr ? "remedio" : h.mood];
+  const h = humorAtual(), t = Date.now(), pr = remedioPendente();
+  const anim = pr ? "remedio" : h.mood;
   if ($("cat").dataset.anim !== anim) {
     $("cat").dataset.anim = anim;
-    $("cat").innerHTML = '<img src="assets/calico-'.concat(anim, '.apng" alt="">');
+    $("cat").innerHTML = '<img src="assets/humor-'.concat(anim, '.apng" alt="">');
   }
-  $("bubble").textContent = pr ? "Hora de tomar " + MEDS[pr] + '! Toque em "Tomei agora".' : h.e ? FRASE[h.mood] + " (" + NOME[h.k] + " " + h.n + ", h\xE1 " + ha(t - h.e.t) + ")" : "Como voc\xEA est\xE1 agora? Marque abaixo.";
-  $("pills").innerHTML = ["rit", "esc"].map((k) => {
-    const d = lastDoseBefore(k, t);
-    return "<span>".concat(MEDS[k], ": <b>").concat(d ? "h\xE1 " + ha(t - d.t) : "\u2014", "</b></span>");
+  $("bubble").textContent = pr ? "Hora de tomar " + nomeMed(pr) + '! Toque em "Tomei agora".' : h.e ? FRASE[h.mood] + " (" + NOME[h.k] + " " + h.n + ", h\xE1 " + ha(t - h.e.t) + ")" : "Como voc\xEA est\xE1 agora? Marque abaixo.";
+  $("pills").innerHTML = S.meds.map((m) => {
+    const d = lastDoseBefore(m.id, t);
+    return "<span>".concat(esc(m.nome), ": <b>").concat(d ? "h\xE1 " + ha(t - d.t) : "\u2014", "</b></span>");
   }).join("");
 }
 function render() {
@@ -398,8 +442,7 @@ function render() {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
 }
 function keepForm(fn) {
-  var _a, _b, _c;
-  const v = { nota: (_a = $("nota")) == null ? void 0 : _a.value, motivo: (_b = $("motivo")) == null ? void 0 : _b.value, quando: (_c = $("quando")) == null ? void 0 : _c.value };
+  const v = { nota: $("nota") && $("nota").value, motivo: $("motivo") && $("motivo").value, quando: $("quando") && $("quando").value };
   fn();
   render();
   if ($("nota") && v.nota) $("nota").value = v.nota;
@@ -409,7 +452,7 @@ function keepForm(fn) {
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("button");
   if (!b) {
-    if (e.target.id === "sheet") $("sheet").classList.remove("show");
+    if (e.target.id === "sheet") fecharFolha();
     return;
   }
   const d = b.dataset;
@@ -424,20 +467,100 @@ document.addEventListener("click", async (e) => {
   else if (d.lv) keepForm(() => {
     pend[d.lv] = +d.n;
   });
-  else if (d.per) {
+  else if (d.echip) {
+    if (edPend[d.echip]) delete edPend[d.echip];
+    else edPend[d.echip] = 3;
+    redesenharEdicao($("sheetIn").querySelector("[data-salvae]").dataset.salvae);
+  } else if (d.elv) {
+    edPend[d.elv] = +d.n;
+    redesenharEdicao($("sheetIn").querySelector("[data-salvae]").dataset.salvae);
+  } else if (d.per) {
     periodo = +d.per;
     render();
   } else if (d.dose) abrirDose(d.dose);
   else if (d.savedose) {
-    const t = new Date($("dQuando").value).getTime() || Date.now(), dose = $("dDose").value.trim();
-    S.doses.push({ id: "m" + Date.now(), med: d.savedose, dose, t });
+    const t = lerData("dQuando"), dose = $("dDose").value.trim();
+    S.doses.push({ id: "m" + Date.now(), med: d.savedose, nome: nomeMed(d.savedose), dose, t });
     S.lastDose[d.savedose] = dose;
     save();
-    $("sheet").classList.remove("show");
+    fecharFolha();
     render();
-    toast(MEDS[d.savedose] + " registrada");
-  } else if (d.act === "fechar") $("sheet").classList.remove("show");
-  else if (d.act === "lembretes") abrirLembretes();
+    toast(nomeMed(d.savedose) + " registrado");
+  } else if (d.ede) abrirEdicaoRegistro(d.ede);
+  else if (d.edd) abrirEdicaoDose(d.edd);
+  else if (d.salvae) {
+    const en = S.entries.find((x) => x.id === d.salvae);
+    if (!en) return;
+    const s = Object.entries(edPend).map(([k, n]) => ({ k, n })), nota = $("eNota").value.trim();
+    if (!s.length && !nota) {
+      toast("Marque pelo menos um item");
+      return;
+    }
+    en.t = lerData("eQuando");
+    en.s = s;
+    en.nota = nota;
+    en.motivo = edPend.naosair && $("eMotivo") ? $("eMotivo").value.trim() : "";
+    save();
+    fecharFolha();
+    render();
+    toast("Registro atualizado");
+  } else if (d.salvad) {
+    const ds = S.doses.find((x) => x.id === d.salvad);
+    if (!ds) return;
+    ds.med = $("xMed").value;
+    ds.nome = nomeMed(ds.med, ds);
+    ds.dose = $("xDose").value.trim();
+    ds.t = lerData("xQuando");
+    save();
+    fecharFolha();
+    render();
+    toast("Dose atualizada");
+  } else if (d.dele) {
+    if (confirm("Excluir este registro?")) {
+      S.entries = S.entries.filter((x) => x.id !== d.dele);
+      save();
+      fecharFolha();
+      render();
+    }
+  } else if (d.deld) {
+    if (confirm("Excluir esta dose?")) {
+      S.doses = S.doses.filter((x) => x.id !== d.deld);
+      save();
+      fecharFolha();
+      render();
+    }
+  } else if (d.act === "fechar") fecharFolha();
+  else if (d.act === "remedios") abrirRemedios();
+  else if (d.act === "addmed") {
+    $("listaMeds").insertAdjacentHTML("beforeend", linhaMed("", ""));
+    const ins = $("listaMeds").querySelectorAll(".mn");
+    ins[ins.length - 1].focus();
+  } else if (d.rmmed) b.closest(".selrow").remove();
+  else if (d.act === "salvarmeds") {
+    const novos = [];
+    document.querySelectorAll("#listaMeds .mn").forEach((i) => {
+      const nome = i.value.trim();
+      if (!nome) return;
+      const id = i.dataset.id || "m" + Date.now().toString(36) + novos.length;
+      novos.push({ id, nome });
+    });
+    if (!novos.length) {
+      toast("Deixe pelo menos um rem\xE9dio");
+      return;
+    }
+    S.meds = novos;
+    S.meds.forEach((m) => {
+      if (!S.lemb[m.id]) S.lemb[m.id] = [];
+    });
+    Object.keys(S.lemb).forEach((k) => {
+      if (!medIds().includes(k)) delete S.lemb[k];
+    });
+    save();
+    await agendarLembretes();
+    fecharFolha();
+    render();
+    toast("Rem\xE9dios salvos");
+  } else if (d.act === "lembretes") abrirLembretes();
   else if (d.act === "flutuante") {
     if (!GW || !GW.flutuante) {
       toast("S\xF3 funciona no app Android");
@@ -457,19 +580,18 @@ document.addEventListener("click", async (e) => {
       toast("Erro: " + (err && err.message || err));
     }
   } else if (d.addh) {
-    const box = $("l-" + d.addh);
-    box.insertAdjacentHTML("beforeend", '<div class="selrow"><input type="time" value="08:00" class="lt" data-med="'.concat(d.addh, '"><button class="btn del" data-rmh="1">Remover</button></div>'));
+    $("l-" + d.addh).insertAdjacentHTML("beforeend", '<div class="selrow"><input type="time" value="08:00" class="lt" data-med="'.concat(d.addh, '"><button class="btn del" data-rmh="1">Remover</button></div>'));
   } else if (d.rmh) b.closest(".selrow").remove();
   else if (d.act === "salvarlemb") {
-    S.lemb = { rit: [], esc: [] };
+    S.meds.forEach((m) => S.lemb[m.id] = []);
     document.querySelectorAll(".lt").forEach((i) => {
-      if (i.value && !S.lemb[i.dataset.med].includes(i.value)) S.lemb[i.dataset.med].push(i.value);
+      const l = S.lemb[i.dataset.med];
+      if (l && i.value && !l.includes(i.value)) l.push(i.value);
     });
-    S.lemb.rit.sort();
-    S.lemb.esc.sort();
+    S.meds.forEach((m) => S.lemb[m.id].sort());
     save();
     await agendarLembretes();
-    if (!$("exato") || !$("exato").innerHTML) $("sheet").classList.remove("show");
+    if (!$("exato") || !$("exato").innerHTML) fecharFolha();
     render();
     toast("Lembretes salvos");
   } else if (d.act === "testelemb") {
@@ -482,38 +604,28 @@ document.addEventListener("click", async (e) => {
       await LN.createChannel({ id: "remedios", name: "Lembretes de rem\xE9dio", importance: 5, visibility: 1, vibration: true });
     } catch (e2) {
     }
-    await LN.schedule({ notifications: [{ id: 2999, title: "Hora da Ritalina (teste)", body: "Toque para registrar que tomou.", channelId: "remedios", schedule: { at: new Date(Date.now() + 5e3), allowWhileIdle: true }, extra: { med: "rit" } }] });
+    const m = S.meds[0];
+    await LN.schedule({ notifications: [{ id: 2999, title: "Hora de tomar " + m.nome + " (teste)", body: "Toque para registrar que tomou.", channelId: "remedios", schedule: { at: new Date(Date.now() + 5e3), allowWhileIdle: true }, extra: { med: m.id } }] });
     toast("Teste em 5 segundos");
   } else if (d.act === "exato") {
     try {
       await LN.changeExactNotificationSetting();
     } catch (e2) {
     }
-    $("sheet").classList.remove("show");
+    fecharFolha();
   } else if (d.act === "salvar") {
-    const s = Object.entries(pend).map(([k, n]) => ({ k, n }));
-    const nota = $("nota").value.trim();
+    const s = Object.entries(pend).map(([k, n]) => ({ k, n })), nota = $("nota").value.trim();
     if (!s.length && !nota) {
       toast("Marque pelo menos um item");
       return;
     }
-    const t = new Date($("quando").value).getTime() || Date.now();
-    S.entries.push({ id: "e" + Date.now(), t, s, nota, motivo: pend.naosair && $("motivo") ? $("motivo").value.trim() : "" });
+    S.entries.push({ id: "e" + Date.now(), t: lerData("quando"), s, nota, motivo: pend.naosair && $("motivo") ? $("motivo").value.trim() : "" });
     save();
     pend = {};
     render();
     window.scrollTo(0, 0);
     toast("Registro salvo");
   } else if (d.act === "compartilhar") compartilhar();
-  else if (d.dele && confirm("Excluir este registro?")) {
-    S.entries = S.entries.filter((x) => x.id !== d.dele);
-    save();
-    render();
-  } else if (d.deld && confirm("Excluir esta dose?")) {
-    S.doses = S.doses.filter((x) => x.id !== d.deld);
-    save();
-    render();
-  }
 });
 render();
 syncWidget();
@@ -542,8 +654,10 @@ function statusFlutuante() {
 }
 statusFlutuante();
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) statusFlutuante();
-  if (!document.hidden) renderTop();
+  if (!document.hidden) {
+    statusFlutuante();
+    renderTop();
+  }
 });
 </script>
 </body>

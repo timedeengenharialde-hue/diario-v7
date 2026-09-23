@@ -25,8 +25,6 @@ import android.widget.ImageView;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
-import java.util.HashMap;
-import java.util.Map;
 
 // Gato flutuante sobre os outros apps (tipo o botão virtual do iPhone): arrasta, gruda na borda, toque abre o diário
 public class GatoFlutuante extends Service {
@@ -40,11 +38,6 @@ public class GatoFlutuante extends Service {
     private ImageView img;
     private WindowManager.LayoutParams lp;
     private String animAtual = "";
-    private static final Map<String, Integer> QUADROS = new HashMap<>();
-    static {
-        QUADROS.put("happy", 64); QUADROS.put("angry", 41); QUADROS.put("alert", 33); QUADROS.put("sad", 41);
-        QUADROS.put("sleep", 64); QUADROS.put("neutral", 41); QUADROS.put("remedio", 41);
-    }
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -227,12 +220,13 @@ public class GatoFlutuante extends Service {
         ad.setOneShot(false);
         // Cada animação é uma folha 8 colunas x N linhas de quadros 160x120
         int id = getResources().getIdentifier("folha_" + mood, "drawable", getPackageName());
-        Integer total = QUADROS.get(mood);
-        if (id != 0 && total != null) {
+        if (id == 0) id = getResources().getIdentifier("folha_neutral", "drawable", getPackageName());
+        if (id != 0) {
             BitmapFactory.Options o = new BitmapFactory.Options();
             o.inScaled = false;
             Bitmap folha = BitmapFactory.decodeResource(getResources(), id, o);
             if (folha != null) {
+                int total = (folha.getHeight() / 120) * 8;
                 for (int i = 0; i < total; i++) {
                     Bitmap q = Bitmap.createBitmap(folha, (i % 8) * 160, (i / 8) * 120, 160, 120);
                     ad.addFrame(new BitmapDrawable(getResources(), q), 125);
