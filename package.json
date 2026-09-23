@@ -1,0 +1,17 @@
+{
+  "name": "diario-sintomas",
+  "version": "7.0.0",
+  "private": true,
+  "scripts": {
+    "capacitor:sync:after": "node nativo/instalar.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/local-notifications": "8.3.1",
+    "@capacitor/share": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}
