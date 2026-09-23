@@ -72,12 +72,12 @@ td.n{text-align:right;white-space:nowrap}
 </style>
 </head>
 <body>
-<main><div class="top"><div class="bubble" id="bubble"></div><div class="pillbox" id="pills"></div><div class="cat" id="cat"></div></div><div id="err"></div><div id="main"><div class="card">Carregando… (versão 9)</div></div></main>
+<main><div class="top"><div class="bubble" id="bubble"></div><div class="pillbox" id="pills"></div><div class="cat" id="cat"></div></div><div id="err"></div><div id="main"><div class="card">Carregando… (versão 10)</div></div></main>
 <nav>
   <button data-tab="hoje" class="on">Registrar</button>
   <button data-tab="rel">Relatório</button>
   <button data-tab="hist">Histórico</button>
-  <span style="position:absolute;right:6px;bottom:2px;font-size:9px;color:#9a9a96">v9 · <span id="bstamp">local</span></span>
+  <span style="position:absolute;right:6px;bottom:2px;font-size:9px;color:#9a9a96">v10 · <span id="bstamp">local</span></span>
 </nav>
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
 <div class="toast" id="toast"></div>
@@ -94,17 +94,20 @@ if (!Array.prototype.flat) Array.prototype.flat = function () { return [].concat
 </script>
 <script src="build.js"></script>
 <script>
-const VERSAO = 9;
+const VERSAO = 10;
 const KEY = "diario-sintomas.v1";
 const CAPN = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const H = 36e5, D = 864e5;
 const GRUPOS = [
-  ["Bem", [["tranquilo", "Tranquilo"], ["focado", "Focado"], ["disposto", "Disposto"]]],
-  ["Energia", [["sonolencia", "Sonol\xEAncia"], ["cansaco", "Cansa\xE7o"], ["agitacao", "Agita\xE7\xE3o"], ["inquietacao", "Inquieta\xE7\xE3o"]]],
-  ["Humor", [["irritacao", "Irrita\xE7\xE3o"], ["ansiedade", "Ansiedade"], ["tristeza", "Tristeza"], ["desanimo", "Des\xE2nimo"], ["choro", "Choro f\xE1cil"]]],
-  ["Foco", [["distracao", "Distra\xE7\xE3o"], ["esquecimento", "Esquecimento"], ["procrastinacao", "Procrastina\xE7\xE3o"], ["hiperfoco", "Hiperfoco"]]],
-  ["Corpo", [["apetite", "Falta de apetite"], ["insonia", "Ins\xF4nia"], ["cabeca", "Dor de cabe\xE7a"], ["coracao", "Cora\xE7\xE3o acelerado"], ["nausea", "N\xE1usea"]]],
-  ["Social", [["naosair", "N\xE3o quis sair"], ["evitar", "Evitei pessoas"]]]
+  ["\u{1F60A} Bem-estar", [["alegre", "Feliz"], ["tranquilo", "Tranquilo"], ["relaxado", "Relaxado"], ["grato", "Grato"], ["confiante", "Confiante"]]],
+  ["\u26A1 Energia boa", [["disposto", "Disposto"], ["descansado", "Dormi bem"], ["motivado", "Motivado"], ["animado", "Animado"]]],
+  ["\u{1F3AF} Foco bom", [["focado", "Focado"], ["produtivo", "Produtivo"], ["criativo", "Criativo"]]],
+  ["\u{1F91D} Social bom", [["saiu", "Sa\xED / vi pessoas"], ["conversou", "Conversei com algu\xE9m"], ["carinho", "Recebi carinho"]]],
+  ["\u{1F634} Energia baixa", [["sonolencia", "Sonol\xEAncia"], ["cansaco", "Cansa\xE7o"], ["agitacao", "Agita\xE7\xE3o"], ["inquietacao", "Inquieta\xE7\xE3o"]]],
+  ["\u{1F327}\uFE0F Humor", [["irritacao", "Irrita\xE7\xE3o"], ["frustracao", "Frustra\xE7\xE3o"], ["ansiedade", "Ansiedade"], ["tristeza", "Tristeza"], ["desanimo", "Des\xE2nimo"], ["choro", "Choro f\xE1cil"], ["culpa", "Culpa"], ["solidao", "Solid\xE3o"]]],
+  ["\u{1F300} Foco", [["distracao", "Distra\xE7\xE3o"], ["esquecimento", "Esquecimento"], ["procrastinacao", "Procrastina\xE7\xE3o"], ["hiperfoco", "Hiperfoco"], ["impulsividade", "Impulsividade"]]],
+  ["\u{1F912} Corpo", [["apetite", "Falta de apetite"], ["insonia", "Ins\xF4nia"], ["cabeca", "Dor de cabe\xE7a"], ["coracao", "Cora\xE7\xE3o acelerado"], ["nausea", "N\xE1usea"], ["bocaseca", "Boca seca"], ["tremor", "Tremor"]]],
+  ["\u{1F6AA} Social dif\xEDcil", [["naosair", "N\xE3o quis sair"], ["evitar", "Evitei pessoas"], ["conflito", "Briga / conflito"]]]
 ];
 const NOME = Object.fromEntries(GRUPOS.flatMap((g) => g[1]));
 const MEDS_PADRAO = [{ id: "rit", nome: "Ritalina" }, { id: "esc", nome: "Escitalopram" }];
@@ -351,32 +354,56 @@ function abrirDose(k) {
   abrirFolha("<h2>Tomei ".concat(esc(nomeMed(k)), '</h2>\n    <label class="f">Dose<input type="text" id="dDose" value="').concat(esc(S.lastDose[k] || ""), '" placeholder="Ex.: 10 mg"></label>\n    <label class="f">Hor\xE1rio<input type="datetime-local" id="dQuando" value="').concat(toLocal(Date.now()), '"></label>\n    <div class="row2"><button class="btn ghost" data-act="fechar">Cancelar</button><button class="btn pri" data-savedose="').concat(k, '">Salvar</button></div>'));
 }
 const HUMOR = {
-  tranquilo: "feliz",
-  focado: "feliz",
-  disposto: "feliz",
+  alegre: "feliz",
+  confiante: "feliz",
+  tranquilo: "tranquilo",
+  relaxado: "tranquilo",
+  descansado: "tranquilo",
+  grato: "carinho",
+  saiu: "carinho",
+  conversou: "carinho",
+  carinho: "carinho",
+  disposto: "energia",
+  motivado: "energia",
+  animado: "brincalhao",
+  criativo: "brincalhao",
+  focado: "focado",
+  produtivo: "focado",
   sonolencia: "sono",
   cansaco: "sono",
   insonia: "sono",
   irritacao: "irritado",
   agitacao: "irritado",
+  frustracao: "irritado",
+  conflito: "irritado",
   ansiedade: "ansioso",
   coracao: "ansioso",
   inquietacao: "ansioso",
+  tremor: "ansioso",
   distracao: "semfoco",
   esquecimento: "semfoco",
   procrastinacao: "semfoco",
   hiperfoco: "semfoco",
+  impulsividade: "semfoco",
   tristeza: "triste",
   desanimo: "triste",
   choro: "triste",
+  culpa: "triste",
+  solidao: "triste",
   naosair: "triste",
   evitar: "triste",
   apetite: "indisposto",
   cabeca: "indisposto",
-  nausea: "indisposto"
+  nausea: "indisposto",
+  bocaseca: "indisposto"
 };
 const FRASE = {
   feliz: "Que bom! Voc\xEA est\xE1 bem.",
+  tranquilo: "Calmo e relaxado.",
+  carinho: "Cora\xE7\xE3o quentinho.",
+  energia: "Cheio de energia!",
+  brincalhao: "Animado e criativo!",
+  focado: "Focado e produtivo.",
   sono: "Com sono ou cansado.",
   irritado: "Irritado ou agitado.",
   ansioso: "Ansioso ou inquieto.",
@@ -384,7 +411,7 @@ const FRASE = {
   triste: "Pra baixo, dia nublado.",
   indisposto: "O corpo n\xE3o est\xE1 legal."
 };
-const PRIO = ["irritado", "ansioso", "triste", "indisposto", "semfoco", "sono", "feliz"];
+const PRIO = ["irritado", "ansioso", "triste", "indisposto", "semfoco", "sono", "focado", "energia", "brincalhao", "carinho", "tranquilo", "feliz"];
 function humorAtual() {
   const e = S.entries.slice().sort((a, b) => b.t - a.t || +b.id.slice(1) - +a.id.slice(1))[0];
   if (!e || Date.now() - e.t > 12 * H || !e.s.length) return { mood: "neutral", e: null };
